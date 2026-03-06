@@ -1,0 +1,34 @@
+{
+  "project_info": {
+    "project_number": "994830157258",
+    "project_id": "skilloura",
+    "storage_bucket": "skilloura.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:994830157258:android:dac6a623f62cce52f53b33",
+        "android_client_info": {
+          "package_name": "com.example.skillaura"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "994830157258-eo8jvf08legmhs04allpjjtf4piskjmv.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBAXQohNovoP8NNVr04EZNM2bOYKIyQWl0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

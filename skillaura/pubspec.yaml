@@ -1,0 +1,45 @@
+name: skillaura
+description: "InternMatch AI - Intelligent Career Assistant for Students"
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.5.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Navigation
+  go_router: ^14.3.0
+
+  # UI / Fonts / Icons
+  google_fonts: ^6.2.1
+  cupertino_icons: ^1.0.8
+
+  # Charts & Progress
+  fl_chart: ^0.66.2
+  percent_indicator: ^4.2.3
+
+  # Utils
+  uuid: ^4.4.2
+  firebase_core: ^4.4.0
+  firebase_auth: ^6.1.4
+  cloud_firestore: 6.1.2
+  firebase_storage: ^13.0.6
+  google_sign_in: ^7.2.0
+  flutter_web_auth_2: ^5.0.1
+  file_picker: ^8.0.0+1
+  image_picker: ^1.1.2
+  http: ^1.2.0
+  url_launcher: ^6.3.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+

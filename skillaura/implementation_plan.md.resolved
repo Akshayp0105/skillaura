@@ -1,0 +1,126 @@
+# InternMatch AI - Detailed Implementation Plan
+
+## Goal Description
+Build a comprehensive Flutter application, **InternMatch AI**, designed to be an intelligent career assistant for students. The platform will analyze resumes/GitHub profiles, provide personalized internship recommendations, identify skill gaps, and offer AI-driven interview preparation.
+
+## User Review Required
+> [!IMPORTANT]
+> **Tech Stack Decision**: The plan assumes a **Flutter** frontend for cross-platform mobile/web support and a **Python (FastAPI)** backend to leverage robust AI/ML libraries.
+> **AI Services**: We will use OpenAI's API (or similar LLMs) for the sophisticated conversational features (Mock Interview, English Practice) and resume feedback. This will incur usage costs.
+> **Database**: PostgreSQL is recommended for structured data (Users, Jobs), while MongoDB or Firebase could be used for flexible document storage (Resumes, Interview Transcripts).
+
+## Proposed Architecture
+
+### 1. Frontend: Flutter (Mobile & Web)
+We will use **Clean Architecture** with **BLoC** (Business Logic Component) for state management to ensure scalability and testability.
+
+#### **Directory Structure Estimate**
+```
+lib/
+├── core/
+│   ├── constants/          # API endpoints, assets, strings
+│   ├── theme/              # App theme, colors, text styles
+│   ├── utils/              # Validators, date formatters
+│   └── errors/             # Failure classes
+├── data/
+│   ├── models/             # API response models (fromJson/toJson)
+│   ├── repositories/       # Implementation of domain repositories
+│   └── datasources/        # Remote (API) and Local (Storage) data sources
+├── domain/
+│   ├── entities/           # Pure Dart classes (User, Resume, Job)
+│   ├── repositories/       # Abstract repository definitions
+│   └── usecases/           # Business logic specific to features (e.g., AnalyzeResume)
+├── presentation/
+│   ├── blocs/              # State management logic
+│   ├── pages/              # UI Screens (Dashboard, Profile, Interview)
+│   └── widgets/            # Reusable UI components
+└── main.dart
+```
+
+#### **Key Modules & Screens**
+*   **Onboarding**: User registration, role selection (Student), basic profile setup.
+*   **Dashboard**:
+    *   **Resume Score Card**: Visual indicator (0-100) with "Improve" button.
+    *   **Internship Feed**: deeply personalized list of jobs based on skill match.
+    *   **Daily Tasks**: "Practice 1 Mock Interview", "Learn SQL", etc.
+*   **Profile**:
+    *   **Resume Upload**: PDF/Docx upload handled via API.
+    *   **GitHub Integration**: Input username to fetch repos and languages.
+    *   **Skill Gap Analysis**: Visual chart comparing User Skills vs. Target Role Skills.
+*   **Interview Prep**:
+    *   **English Practice**: Chat interface with grammar correction bot.
+    *   **Technical Q&A**: Topic-based quizzes (Data Structures, System Design).
+    *   **Mock Interview**: Voice/Text automated interview simulation.
+*   **Jobs**: Detailed view, "Apply" button (redirect or internal), Save Job.
+
+### 2. Backend: Python (FastAPI)
+Python is chosen for its native support for AI/ML libraries.
+
+#### **API Endpoints Strategy**
+
+**A. Authentication (`/auth`)**
+*   `POST /register`: Create account.
+*   `POST /login`: JWT token generation.
+*   `GET /me`: Get current user profile.
+
+**B. Resume & Profile (`/profile`)**
+*   `POST /resume/upload`: Upload PDF.
+    *   *Process*: Extract text -> Run NER (Named Entity Recognition) -> Calculate ATS Score -> Return Analysis.
+*   `GET /github/{username}`: Fetch public repos, top languages.
+*   `GET /skills/gap`: Input target role (e.g., "Junior React Dev") -> Compare with user skills -> Return missing skills.
+
+**C. Jobs & Matching (`/jobs`)**
+*   `GET /recommendations`: Get jobs sorted by `match_score`.
+    *   *Algorithm*: Cosine similarity between User Vector (Skills + Bio) and Job Vector (Description).
+*   `GET /search`: Keyword search.
+
+**D. Interview Prep (`/interview`)**
+*   `POST /mock/start`: Initialize a session (e.g., "Behavioral", "System Design").
+*   `POST /mock/chat`: Sending user response -> AI generates follow-up question + feedback.
+*   `POST /english/practice`: Send text -> AI corrects grammar and suggests phrasing.
+
+### 3. Database Schema (PostgreSQL/SQLAlchemy)
+
+**Users Table**
+*   `id` (UUID, PK)
+*   `email`, `password_hash`
+*   `full_name`, `university`
+*   `role` (Student, Admin)
+*   `created_at`
+
+**Resumes Table**
+*   `id` (UUID, PK)
+*   `user_id` (FK)
+*   `file_url` (S3/Firebase Storage path)
+*   `parsed_text` (Text)
+*   `extracted_skills` (JSON array)
+*   `ats_score` (Integer)
+*   `improvements_suggested` (JSON)
+
+**Jobs Table**
+*   `id` (UUID, PK)
+*   `title`, `company`, `location`
+*   `description` (Text)
+*   `required_skills` (JSON array)
+*   `posted_at`
+
+**InterviewSessions Table**
+*   `id` (UUID, PK)
+*   `user_id` (FK)
+*   `type` (Enum: Technical, Behavioral, English)
+*   `transcript` (JSON: [{role: "ai", content: "..."}, {role: "user", content: "..."}])
+*   `overall_score` (Float)
+*   `feedback_report` (Text)
+
+## Integrations & Services
+*   **Resume Parsing**: `PyMuPDF` for extraction, `spaCy` for NER.
+*   **LLM (AI Core)**: OpenAI API (`gpt-4o` or `gpt-3.5-turbo`) for:
+    *   Mock Interview conversation.
+    *   Resume feedback generation.
+    *   English grammar correction.
+*   **Storage**: AWS S3 or Firebase Cloud Storage for Resume PDFs and User avatars.
+
+## Next Steps
+1.  **Approval**: Confirm this plan matches your vision.
+2.  **Setup**: Initialize Flutter project and Python virtual environment.
+3.  **Prototype**: Build the "Resume Upload & Analysis" feature first as it's the core.

@@ -1,0 +1,28 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "skilloura",
+          "appId": "1:994830157258:android:dac6a623f62cce52f53b33",
+          "fileOutput": "android/app/google-services.json"
+        }
+      }
+    },
+    "dart": {
+      "lib/firebase_options.dart": {
+        "projectId": "skilloura",
+        "configurations": {
+          "android": "1:994830157258:android:dac6a623f62cce52f53b33",
+          "ios": "1:994830157258:ios:3b12a7a3f026b35af53b33",
+          "macos": "1:994830157258:ios:3b12a7a3f026b35af53b33",
+          "web": "1:994830157258:web:a7d0b6dd916b2d0cf53b33",
+          "windows": "1:994830157258:web:ed8539a8ce268193f53b33"
+        }
+      }
+    }
+  },
+  "firestore": {
+    "rules": "firestore.rules"
+  }
+}
