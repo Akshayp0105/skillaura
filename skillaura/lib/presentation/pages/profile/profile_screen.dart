@@ -784,7 +784,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error fetching GitHub: $e')),
+          SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
         );
       }
       setState(() => _githubLoading = false);

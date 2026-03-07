@@ -1603,23 +1603,86 @@ import time as _time
 import tempfile
 import random
 import ast
+import httpx as _httpx
+import datetime as _dt
+
+_GEMINI_KEY = os.getenv("GEMINI_API_KEY", "")
+_GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+
+async def _gemini_review(code: str, title: str, language: str, all_passed: bool) -> dict:
+    """Call Gemini to get AI code review. Returns structured feedback dict."""
+    if not _GEMINI_KEY:
+        return {"verdict": "Unknown", "feedback": "AI review unavailable (no API key).", "time_complexity": "N/A", "space_complexity": "N/A", "score": 50}
+
+    is_skeleton = "pass" in code and len([l for l in code.strip().splitlines() if l.strip() and not l.strip().startswith("#") and l.strip() != "pass"]) < 5
+    verdict = "Accepted" if all_passed and not is_skeleton else ("Incomplete" if is_skeleton else "Wrong Answer")
+
+    prompt = f"""You are a coding interview reviewer. Analyze this {language} solution for the problem '{title}'.
+
+Code:
+```{language}
+{code}
+```
+
+Test result: {'All test cases PASSED' if all_passed else 'Some test cases FAILED'}.
+Is skeleton/incomplete: {is_skeleton}.
+
+Respond ONLY with a JSON object (no markdown) with these exact fields:
+- verdict: one of 'Accepted', 'Wrong Answer', 'Incomplete', 'Time Limit Exceeded'
+- feedback: 2-3 sentences of specific, helpful feedback
+- time_complexity: Big-O string e.g. 'O(n)'
+- space_complexity: Big-O string e.g. 'O(1)'
+- score: integer 0-100"""
+
+    try:
+        async with _httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post(
+                f"{_GEMINI_URL}?key={_GEMINI_KEY}",
+                json={"contents": [{"parts": [{"text": prompt}]}]},
+            )
+        if resp.status_code == 200:
+            raw = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+            # Strip markdown code fences if present
+            raw = raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+            return json.loads(raw)
+    except Exception:
+        pass
+    return {"verdict": verdict, "feedback": "Solution evaluated based on test results.", "time_complexity": "N/A", "space_complexity": "N/A", "score": 80 if all_passed else 0}
 
 # ── Coding: Companies ─────────────────────────────────────────────────────────
 @app.get("/coding/companies")
 async def get_companies(search: str = ""):
+    # Always return alphabetically sorted
+    sorted_companies = sorted(COMPANIES, key=lambda c: c["name"].lower())
     if search:
         q = search.lower()
-        return [c for c in COMPANIES if q in c["name"].lower()]
-    return COMPANIES
+        return [c for c in sorted_companies if q in c["name"].lower()]
+    return sorted_companies
 
 
 # ── Coding: Questions per company ─────────────────────────────────────────────
 @app.get("/coding/questions/{company_id}")
 async def get_company_questions(company_id: str, difficulty: str = ""):
-    qs = [q for q in CODING_QUESTIONS if company_id in q.get("companies", [])]
+    # Find how many questions this company claims to have
+    company_meta = next((c for c in COMPANIES if c["id"] == company_id), None)
+    target = company_meta["questions"] if company_meta else len(CODING_QUESTIONS)
+
+    # Get tagged questions specific to this company
+    tagged_ids = {q["id"] for q in CODING_QUESTIONS if company_id in q.get("companies", [])}
+    tagged = [q for q in CODING_QUESTIONS if q["id"] in tagged_ids]
+
+    # Pad up to `target` using company-seeded shuffle of the remaining pool
+    if len(tagged) < target:
+        rng = random.Random(company_id)
+        extras = [q for q in CODING_QUESTIONS if q["id"] not in tagged_ids]
+        rng.shuffle(extras)
+        tagged = tagged + extras[:target - len(tagged)]
+
+    # Filter by difficulty if requested
     if difficulty and difficulty.lower() != "all":
-        qs = [q for q in qs if q["difficulty"].lower() == difficulty.lower()]
-    # Return lightweight version (no starter_code / test_cases in list)
+        tagged = [q for q in tagged if q["difficulty"].lower() == difficulty.lower()]
+
+    # Return lightweight list (no starter_code / test_cases)
     return [
         {
             "id": q["id"],
@@ -1629,7 +1692,7 @@ async def get_company_questions(company_id: str, difficulty: str = ""):
             "frequency": q["frequency"],
             "acceptance": q["acceptance"],
         }
-        for q in qs
+        for q in tagged
     ]
 
 
@@ -1689,31 +1752,10 @@ def _ext(cmd: list) -> str:
 
 def _make_python_testable(code: str, test_case: dict) -> str:
     """Wrap user's Solution class with a test runner."""
-    inp  = test_case.get("input", "")
-    exp  = test_case.get("expected", "")
-    return f"""{code}
-
-# ── Auto test runner ──
-import json, ast as _ast
-sol = Solution()
-try:
-    # parse inputs
-    _lines = {repr(inp)}.strip().split("\\n")
-    _vars = {{}}
-    for _l in _lines:
-        if "=" in _l:
-            _k, _, _v = _l.partition("=")
-            try:
-                _vars[_k.strip()] = _ast.literal_eval(_v.strip())
-            except:
-                _vars[_k.strip()] = _v.strip()
-    # try calling first method
-    _m = [m for m in dir(sol) if not m.startswith("_")][0]
-    _res = getattr(sol, _m)(**_vars)
-    print(_res)
-except Exception as _e:
-    print(f"ERROR: {{_e}}")
-"""
+    inp = test_case.get("input", "")
+    # Use repr so the string is safely embedded as a Python literal
+    inp_repr = repr(inp)
+    return f"{code}\n\n# ── Auto test runner ──\nimport ast as _ast\nsol = Solution()\ntry:\n    _lines = {inp_repr}.strip().split('\\n')\n    _vars = {{}}\n    for _l in _lines:\n        if '=' in _l:\n            _k, _, _v = _l.partition('=')\n            try:\n                _vars[_k.strip()] = _ast.literal_eval(_v.strip())\n            except Exception:\n                _vars[_k.strip()] = _v.strip()\n    _m = [m for m in dir(sol) if not m.startswith('_')][0]\n    _res = getattr(sol, _m)(**_vars)\n    print(repr(_res))\nexcept Exception as _e:\n    print(f'ERROR: {{_e}}')\n"
 
 @app.post("/coding/run")
 async def run_code(req: CodeRunRequest):
@@ -1727,7 +1769,13 @@ async def run_code(req: CodeRunRequest):
             r = _run_in_sandbox(cmd, wrapped, tc.get("input", ""), timeout=5)
             actual = r["stdout"].strip()
             expected = tc.get("expected", "").strip()
-            passed = actual == expected if expected else True
+            # Only pass if: expected matches actual, OR code produced non-empty non-None output
+            # NEVER auto-pass skeleton code (empty output)
+            if expected:
+                passed = actual == expected
+            else:
+                # no expected value — pass only if code ran without error and returned something
+                passed = bool(actual) and actual != "None" and not actual.startswith("ERROR:")
             results.append({
                 "case": i + 1,
                 "input": tc.get("input", ""),
@@ -1828,19 +1876,125 @@ async def evaluate_code(req: CodeEvalRequest):
     }
 
 
+# ── Coding: Submit (run + AI review) ──────────────────────────────────────────
+class SubmitRequest(BaseModel):
+    code: str
+    language: str = "python"
+    question_id: str
+    user_id: Optional[str] = None   # Firebase UID for saving to Firestore
+
+@app.post("/coding/submit")
+async def submit_code(req: SubmitRequest):
+    # 1. Find the question to get test cases and title
+    question = next((q for q in CODING_QUESTIONS if q["id"] == req.question_id), None)
+    if not question:
+        raise HTTPException(status_code=404, detail="Question not found")
+
+    title = question.get("title", "Unknown Problem")
+    test_cases = question.get("test_cases", [])
+
+    # 2. Run against all test cases
+    lang = req.language.lower()
+    results = []
+
+    # Detect skeleton / unmodified code (contains only pass or stub)
+    code_lines = [l.strip() for l in req.code.strip().splitlines()
+                  if l.strip() and not l.strip().startswith("#")]
+    is_skeleton = all(l in ("pass", "return new int[0];", "return null;", "return 0;",
+                             "return false;", "return {};", "return nullptr;", "return -1;",
+                             "// Write your solution here", "// Implement",
+                             "# Write your solution here") or "pass" == l
+                   for l in code_lines if l not in
+                   {"class Solution:", "class Solution {", "public:", "}"})
+
+    if lang == "python":
+        cmd = [sys.executable]
+        if test_cases:
+            for i, tc in enumerate(test_cases):
+                wrapped = _make_python_testable(req.code, tc)
+                r = _run_in_sandbox(cmd, wrapped, tc.get("input", ""), timeout=5)
+                actual = r["stdout"].strip()
+                expected = tc.get("expected", "").strip()
+                if expected:
+                    passed = actual == expected
+                else:
+                    passed = bool(actual) and actual not in ("None", "") and not actual.startswith("ERROR:")
+                results.append({
+                    "case": i + 1, "input": tc.get("input", ""),
+                    "expected": expected, "actual": actual,
+                    "passed": passed, "time_ms": r["time_ms"], "error": r["stderr"],
+                })
+        else:
+            # No test cases — run directly and check for errors
+            r = _run_in_sandbox(cmd, req.code, "", timeout=5)
+            passed = r["exit_code"] == 0 and not r["stderr"] and not is_skeleton
+            results.append({
+                "case": 1, "input": "", "expected": "", "actual": r["stdout"].strip(),
+                "passed": passed, "time_ms": r["time_ms"], "error": r["stderr"],
+            })
+    else:
+        # For JS/Java, just run and check for errors
+        if lang == "javascript":
+            cmd = ["node"]
+            code_to_run = req.code + "\n// submission run"
+            r = _run_in_sandbox(cmd, code_to_run, "", timeout=5)
+        elif lang == "java":
+            cmd = ["java", "--source", "21"]
+            r = _run_in_sandbox(cmd, req.code, "", timeout=10)
+        else:
+            r = {"stdout": "", "stderr": "Language not supported", "exit_code": -1, "time_ms": 0}
+        passed = r["exit_code"] == 0 and not is_skeleton
+        results.append({
+            "case": 1, "input": "", "expected": "", "actual": r["stdout"].strip(),
+            "passed": passed, "time_ms": r["time_ms"], "error": r["stderr"],
+        })
+
+    total = len(results)
+    passed_count = sum(1 for r in results if r.get("passed", False))
+    all_passed = passed_count == total and total > 0 and not is_skeleton
+
+    # 3. Get AI review from Gemini
+    ai_review = await _gemini_review(req.code, title, req.language, all_passed)
+
+    # Override verdict if skeleton
+    if is_skeleton:
+        ai_review["verdict"] = "Incomplete"
+        ai_review["score"] = 0
+        ai_review["feedback"] = "Your solution contains only skeleton/placeholder code. Please implement the solution before submitting."
+
+    # 4. Build response
+    response = {
+        "all_passed": all_passed,
+        "passed": passed_count,
+        "total": total,
+        "test_results": results,
+        "language": req.language,
+        "ai_review": ai_review,
+        "question_title": title,
+        "submitted_at": _dt.datetime.now(_dt.timezone.utc).isoformat(),
+        "user_id": req.user_id,
+    }
+    return response
+
+
 # ── Aptitude ──────────────────────────────────────────────────────────────────
 @app.get("/aptitude/categories")
 async def get_aptitude_categories():
     return APTITUDE_CATEGORIES
 
 @app.get("/aptitude/questions/{category_id}")
-async def get_aptitude_questions(category_id: str, count: int = 15):
+async def get_aptitude_questions(category_id: str, count: int = 15, session: int = 0):
+    """
+    Returns `count` questions shuffled differently per session.
+    Pass a unique `session` int (e.g. Unix timestamp) so questions rotate each test.
+    """
     qs = APTITUDE_QUESTIONS.get(category_id, [])
     if not qs:
         raise HTTPException(status_code=404, detail=f"Category '{category_id}' not found")
-    # Shuffle and pick `count`
-    selected = random.sample(qs, min(count, len(qs)))
-    return selected
+    rng = random.Random(session if session else random.randint(0, 999999))
+    pool = list(qs)
+    rng.shuffle(pool)
+    return pool[:min(count, len(pool))]
 
 
 # ── Mock Test ─────────────────────────────────────────────────────────────────
@@ -1849,11 +2003,205 @@ async def get_mock_domains():
     return MOCK_TEST_DOMAINS
 
 @app.get("/mocktest/questions/{domain_id}")
-async def get_mock_questions(domain_id: str):
+async def get_mock_questions(domain_id: str, session: int = 0):
+    """Returns questions shuffled differently per session."""
     qs = MOCK_TEST_QUESTIONS.get(domain_id, [])
     if not qs:
         raise HTTPException(status_code=404, detail=f"Domain '{domain_id}' not found")
-    return qs
+    rng = random.Random(session if session else random.randint(0, 999999))
+    pool = list(qs)
+    rng.shuffle(pool)
+    return pool
+
+
+# ── Daily Tasks (AI-powered, personalized) ────────────────────────────────────
+class DailyTaskRequest(BaseModel):
+    uid: str
+    skills: List[str] = []
+    streak: int = 0
+    resume_score: int = 0
+    today: str = ""          # YYYY-MM-DD, used as seed
+
+@app.post("/daily/tasks")
+async def generate_daily_tasks(req: DailyTaskRequest):
+    today = req.today or _dt.date.today().isoformat()
+    seed = int(today.replace("-", "")) + req.streak
+    rng = random.Random(seed)
+
+    skills_lower = [s.lower() for s in req.skills]
+    difficulty = "Easy" if req.streak < 3 else ("Medium" if req.streak < 10 else "Hard")
+
+    # ── Pick one coding question deterministically ─────────────────────────────
+    skill_topics = {"python": "Array", "java": "Tree", "javascript": "String",
+                    "c++": "Dynamic Programming", "sql": "Hash Map",
+                    "dsa": "Graph", "algorithms": "Binary Search",
+                    "react": "String", "flutter": "Array", "ml": "Dynamic Programming"}
+    user_topic = next((skill_topics[s] for s in skills_lower if s in skill_topics), None)
+    if user_topic:
+        topic_qs = [q for q in CODING_QUESTIONS if q.get("topic") == user_topic
+                    and q.get("difficulty") == difficulty]
+    else:
+        topic_qs = [q for q in CODING_QUESTIONS if q.get("difficulty") == difficulty]
+    if not topic_qs:
+        topic_qs = list(CODING_QUESTIONS)
+    rng2 = random.Random(seed + 1)
+    coding_q = rng2.choice(topic_qs)
+
+    # First company that has this question (or any company)
+    tagged_cos = [c for c in COMPANIES if coding_q["id"] in
+                  [q["id"] for q in CODING_QUESTIONS if c["id"] in q.get("companies", [])]]
+    company_id = tagged_cos[0]["id"] if tagged_cos else COMPANIES[rng2.randint(0, len(COMPANIES)-1)]["id"]
+    company_name = next((c["name"] for c in COMPANIES if c["id"] == company_id), "Google")
+
+    tasks_from_gemini = []
+    if _GEMINI_KEY and req.skills:
+        prompt = f"""Generate exactly 4 personalized learning tasks for a student with these skills: {', '.join(req.skills[:8])}.
+Their streak is {req.streak} days. ATS resume score: {req.resume_score}/100. Today's difficulty level: {difficulty}.
+Date seed: {today}.
+
+Return ONLY a JSON array (no markdown) of 4 objects, each with:
+- id: unique string like "task_1"
+- title: short action-oriented task title (max 8 words)
+- subtitle: one line description (max 12 words)
+- type: one of [aptitude, english, interview, jobs, resume, mocktest]
+- difficulty: "{difficulty}"
+
+Do NOT include coding tasks (that is handled separately).
+Make tasks relevant to their actual skills and progressive in effort."""
+
+        try:
+            async with _httpx.AsyncClient(timeout=12) as client:
+                resp = await client.post(
+                    f"{_GEMINI_URL}?key={_GEMINI_KEY}",
+                    json={"contents": [{"parts": [{"text": prompt}]}]},
+                )
+            if resp.status_code == 200:
+                raw = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+                raw = raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+                tasks_from_gemini = json.loads(raw)
+        except Exception:
+            pass
+
+    # Fall back to rule-based tasks if Gemini fails
+    if not tasks_from_gemini:
+        pool_tasks = [
+            {"id": "t_aptitude", "title": "Complete Aptitude Practice", "subtitle": "Sharpen quantitative reasoning", "type": "aptitude", "difficulty": difficulty},
+            {"id": "t_english", "title": "English Communication Session", "subtitle": "Practice professional writing", "type": "english", "difficulty": difficulty},
+            {"id": "t_mock", "title": "Take a Mock Interview", "subtitle": "AI-powered interview simulation", "type": "interview", "difficulty": difficulty},
+            {"id": "t_jobs", "title": "Apply to 2 Internships", "subtitle": "Find matching opportunities", "type": "jobs", "difficulty": difficulty},
+            {"id": "t_mocktest", "title": "Complete Domain Mock Test", "subtitle": "Test your knowledge end-to-end", "type": "mocktest", "difficulty": difficulty},
+            {"id": "t_resume", "title": "Improve Your Resume", "subtitle": "Boost ATS score", "type": "resume", "difficulty": "Easy"},
+        ]
+        rng.shuffle(pool_tasks)
+        tasks_from_gemini = pool_tasks[:4]
+
+    # Route mapping
+    routes = {
+        "aptitude": "interview/aptitude",
+        "english": "interview/english-practice",
+        "interview": "interview/mock-interview",
+        "jobs": "jobs",
+        "resume": "profile",
+        "mocktest": "interview/mock-test",
+    }
+    for t in tasks_from_gemini:
+        t["route"] = routes.get(t.get("type", ""), "")
+        t["done"] = False
+
+    # Prepend the coding task
+    coding_task = {
+        "id": f"coding_{coding_q['id']}",
+        "title": f"Solve: {coding_q['title']}",
+        "subtitle": f"{difficulty} · {coding_q.get('topic','Coding')} · {company_name}",
+        "type": "coding",
+        "difficulty": difficulty,
+        "route": "interview/coding-prep",
+        "question_id": coding_q["id"],
+        "company_id": company_id,
+        "done": False,
+    }
+    all_tasks = [coding_task] + tasks_from_gemini[:4]
+    return {"tasks": all_tasks, "difficulty": difficulty, "date": today}
+
+
+# ── Chatbot Proxies (Gemini) ──────────────────────────────────────────────────
+
+@app.post("/mock-interview")
+async def mock_interview_endpoint(data: dict):
+    if not _GEMINI_KEY:
+        raise HTTPException(status_code=500, detail="GEMINI_API_KEY not configured")
+    
+    messages = data.get("messages", [])
+    contents = []
+    system_prompt = (
+        "You are an expert technical interviewer. You are conducting a mock interview. "
+        "Determine the company and role first. Ask relevant technical, behavioral, and system design questions one by one. "
+        "Do not give the answers. Evaluate their response before moving on. "
+        "If they ask for a score or end the interview, provide a final score out of 100, strengths, and improvements."
+    )
+    
+    for i, msg in enumerate(messages):
+        role = "user" if msg.get("role") == "user" else "model"
+        text = msg.get("content", "")
+        if i == 0 and role == "user":
+            text = f"System Instruction: {system_prompt}\\n\\nUser: {text}"
+            
+        contents.append({
+            "role": role,
+            "parts": [{"text": text}]
+        })
+        
+    try:
+        async with _httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(
+                f"{_GEMINI_URL}?key={_GEMINI_KEY}",
+                json={"contents": contents},
+            )
+        if resp.status_code == 200:
+            reply = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+            return {"reply": reply}
+        else:
+            raise HTTPException(status_code=resp.status_code, detail=resp.text)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/chat")
+async def english_practice_chat(data: dict):
+    if not _GEMINI_KEY:
+        raise HTTPException(status_code=500, detail="GEMINI_API_KEY not configured")
+    
+    messages = data.get("messages", [])
+    contents = []
+    system_prompt = (
+        "You are an English Grammar and Communication Coach. "
+        "Correct any grammar mistakes, explain the changes clearly, and give a professional writing tip. "
+        "Keep your tone encouraging and professional."
+    )
+    
+    for i, msg in enumerate(messages):
+        role = "user" if msg.get("role") == "user" else "model"
+        text = msg.get("content", "")
+        if i == 0 and role == "user":
+            text = f"System Instruction: {system_prompt}\\n\\nUser: {text}"
+            
+        contents.append({
+            "role": role,
+            "parts": [{"text": text}]
+        })
+        
+    try:
+        async with _httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(
+                f"{_GEMINI_URL}?key={_GEMINI_KEY}",
+                json={"contents": contents},
+            )
+        if resp.status_code == 200:
+            reply = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+            return {"reply": reply}
+        else:
+            raise HTTPException(status_code=resp.status_code, detail=resp.text)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ──────────────────────────────────────────────────────────────────────────────
 

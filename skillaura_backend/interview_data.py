@@ -4,45 +4,10 @@ Kept in a separate file to avoid bloating main.py
 """
 
 # ═══════════════════════════════════════════════════════════
-#  COMPANIES  (name, question_count, difficulty distribution)
+#  COMPANIES  — imported from companies_data.py (500+ companies)
 # ═══════════════════════════════════════════════════════════
-COMPANIES = [
-    {"id": "google",      "name": "Google",      "questions": 85, "easy": 20, "medium": 40, "hard": 25},
-    {"id": "amazon",      "name": "Amazon",      "questions": 92, "easy": 25, "medium": 42, "hard": 25},
-    {"id": "microsoft",   "name": "Microsoft",   "questions": 78, "easy": 22, "medium": 38, "hard": 18},
-    {"id": "meta",        "name": "Meta",         "questions": 71, "easy": 18, "medium": 35, "hard": 18},
-    {"id": "apple",       "name": "Apple",        "questions": 55, "easy": 15, "medium": 28, "hard": 12},
-    {"id": "adobe",       "name": "Adobe",        "questions": 62, "easy": 20, "medium": 30, "hard": 12},
-    {"id": "uber",        "name": "Uber",         "questions": 48, "easy": 12, "medium": 25, "hard": 11},
-    {"id": "netflix",     "name": "Netflix",      "questions": 40, "easy": 10, "medium": 20, "hard": 10},
-    {"id": "linkedin",    "name": "LinkedIn",     "questions": 52, "easy": 15, "medium": 25, "hard": 12},
-    {"id": "twitter",     "name": "Twitter/X",    "questions": 38, "easy": 10, "medium": 18, "hard": 10},
-    {"id": "flipkart",    "name": "Flipkart",     "questions": 65, "easy": 20, "medium": 30, "hard": 15},
-    {"id": "infosys",     "name": "Infosys",      "questions": 70, "easy": 30, "medium": 28, "hard": 12},
-    {"id": "tcs",         "name": "TCS",          "questions": 75, "easy": 35, "medium": 28, "hard": 12},
-    {"id": "wipro",       "name": "Wipro",        "questions": 60, "easy": 28, "medium": 22, "hard": 10},
-    {"id": "cognizant",   "name": "Cognizant",    "questions": 55, "easy": 25, "medium": 20, "hard": 10},
-    {"id": "accenture",   "name": "Accenture",    "questions": 50, "easy": 22, "medium": 18, "hard": 10},
-    {"id": "oracle",      "name": "Oracle",       "questions": 58, "easy": 18, "medium": 28, "hard": 12},
-    {"id": "salesforce",  "name": "Salesforce",   "questions": 45, "easy": 14, "medium": 22, "hard": 9},
-    {"id": "atlassian",   "name": "Atlassian",    "questions": 42, "easy": 12, "medium": 20, "hard": 10},
-    {"id": "goldman",     "name": "Goldman Sachs","questions": 60, "easy": 15, "medium": 28, "hard": 17},
-    {"id": "jpmorgan",    "name": "JPMorgan",     "questions": 55, "easy": 14, "medium": 26, "hard": 15},
-    {"id": "samsung",     "name": "Samsung",      "questions": 50, "easy": 16, "medium": 24, "hard": 10},
-    {"id": "capgemini",   "name": "Capgemini",    "questions": 48, "easy": 20, "medium": 20, "hard": 8},
-    {"id": "hcl",         "name": "HCL",          "questions": 52, "easy": 22, "medium": 22, "hard": 8},
-    {"id": "mphasis",     "name": "Mphasis",      "questions": 40, "easy": 16, "medium": 18, "hard": 6},
-    {"id": "zoho",        "name": "Zoho",         "questions": 55, "easy": 20, "medium": 25, "hard": 10},
-    {"id": "freshworks",  "name": "Freshworks",   "questions": 45, "easy": 16, "medium": 22, "hard": 7},
-    {"id": "paytm",       "name": "Paytm",        "questions": 42, "easy": 14, "medium": 20, "hard": 8},
-    {"id": "razorpay",    "name": "Razorpay",     "questions": 40, "easy": 12, "medium": 20, "hard": 8},
-    {"id": "swiggy",      "name": "Swiggy",       "questions": 38, "easy": 12, "medium": 18, "hard": 8},
-    {"id": "zomato",      "name": "Zomato",       "questions": 36, "easy": 12, "medium": 16, "hard": 8},
-    {"id": "ola",         "name": "Ola",          "questions": 35, "easy": 12, "medium": 15, "hard": 8},
-    {"id": "byju",        "name": "BYJU'S",       "questions": 38, "easy": 14, "medium": 16, "hard": 8},
-    {"id": "phonepe",     "name": "PhonePe",      "questions": 36, "easy": 12, "medium": 16, "hard": 8},
-    {"id": "meesho",      "name": "Meesho",       "questions": 30, "easy": 10, "medium": 14, "hard": 6},
-]
+from companies_data import COMPANIES  # noqa: F401
+from extra_questions import EXTRA_QUESTIONS  # noqa: F401
 
 # ═══════════════════════════════════════════════════════════
 #  CODING QUESTIONS  (shared pool, tagged by company)
@@ -476,6 +441,8 @@ APTITUDE_QUESTIONS = {
     ],
 }
 
+# ── Extend coding question pool with extra questions ──────────────────────────
+CODING_QUESTIONS.extend(EXTRA_QUESTIONS)
 # ═══════════════════════════════════════════════════════════
 #  MOCK TEST DOMAINS & QUESTIONS
 # ═══════════════════════════════════════════════════════════

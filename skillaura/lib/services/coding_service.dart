@@ -62,6 +62,27 @@ class CodingService {
     return {};
   }
 
+  /// New unified submit endpoint — runs tests + Gemini AI review.
+  Future<Map<String, dynamic>> submitCode({
+    required String code,
+    required String language,
+    required String questionId,
+    String? userId,
+  }) async {
+    final r = await _client.post(
+      Uri.parse('$_base/coding/submit'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'code': code,
+        'language': language,
+        'question_id': questionId,
+        if (userId != null) 'user_id': userId,
+      }),
+    ).timeout(const Duration(seconds: 30)); // allow time for Gemini
+    if (r.statusCode == 200) return json.decode(r.body) as Map<String, dynamic>;
+    return {'error': 'Submit failed: ${r.statusCode}', 'all_passed': false, 'test_results': []};
+  }
+
   Future<List<Map<String, dynamic>>> getAptitudeCategories() async {
     final r = await _client.get(Uri.parse('$_base/aptitude/categories'))
         .timeout(const Duration(seconds: 10));
@@ -70,8 +91,9 @@ class CodingService {
   }
 
   Future<List<Map<String, dynamic>>> getAptitudeQuestions(String categoryId, {int count = 15}) async {
+    final session = DateTime.now().millisecondsSinceEpoch ~/ 1000; // unix seconds
     final uri = Uri.parse('$_base/aptitude/questions/$categoryId')
-        .replace(queryParameters: {'count': count.toString()});
+        .replace(queryParameters: {'count': count.toString(), 'session': session.toString()});
     final r = await _client.get(uri).timeout(const Duration(seconds: 10));
     if (r.statusCode == 200) return List<Map<String, dynamic>>.from(json.decode(r.body));
     return [];
@@ -85,8 +107,10 @@ class CodingService {
   }
 
   Future<List<Map<String, dynamic>>> getMockQuestions(String domainId) async {
-    final r = await _client.get(Uri.parse('$_base/mocktest/questions/$domainId'))
-        .timeout(const Duration(seconds: 10));
+    final session = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    final uri = Uri.parse('$_base/mocktest/questions/$domainId')
+        .replace(queryParameters: {'session': session.toString()});
+    final r = await _client.get(uri).timeout(const Duration(seconds: 10));
     if (r.statusCode == 200) return List<Map<String, dynamic>>.from(json.decode(r.body));
     return [];
   }

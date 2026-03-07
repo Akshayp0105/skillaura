@@ -29,7 +29,7 @@ class InterviewHubScreen extends StatelessWidget {
       subtitle: 'Practice 500+ real company questions with live code execution',
       gradient: AppColors.purpleGradient,
       route: AppConstants.routeCodingPrep,
-      badge: '35 Companies',
+      badge: '500+ Companies',
     ),
     _InterviewCard(
       icon: Icons.calculate_rounded,

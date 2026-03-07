@@ -15,9 +15,12 @@ class GitHubService {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         return GitHubUser.fromJson(data);
+      } else if (response.statusCode == 403) {
+        throw Exception('GitHub API rate limit exceeded. Please try again later.');
       }
       return null;
     } catch (e) {
+      if (e.toString().contains('rate limit')) rethrow;
       return null;
     }
   }
@@ -33,9 +36,12 @@ class GitHubService {
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
         return data.map((repo) => GitHubRepo.fromJson(repo)).toList();
+      } else if (response.statusCode == 403) {
+        throw Exception('GitHub API rate limit exceeded. Please try again later.');
       }
       return [];
     } catch (e) {
+      if (e.toString().contains('rate limit')) rethrow;
       return [];
     }
   }

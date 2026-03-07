@@ -13,6 +13,7 @@ import '../../presentation/pages/interview/aptitude_screen.dart';
 import '../../presentation/pages/interview/aptitude_test_screen.dart';
 import '../../presentation/pages/interview/mock_test_screen.dart';
 import '../../presentation/pages/interview/mock_test_exam_screen.dart';
+import '../../presentation/pages/interview/mock_interview_chat_screen.dart';
 import '../../presentation/pages/jobs/job_detail_screen.dart';
 import '../../presentation/pages/jobs/jobs_screen.dart';
 import '../../presentation/pages/onboarding/onboarding_screen.dart';
@@ -67,6 +68,10 @@ final GoRouter appRouter = GoRouter(
             GoRoute(
               path: AppConstants.routeEnglishPractice,
               builder: (context, state) => const EnglishPracticeScreen(),
+            ),
+            GoRoute(
+              path: AppConstants.routeMockInterview,
+              builder: (context, state) => const MockInterviewChatScreen(),
             ),
             // Coding Prep module
             GoRoute(

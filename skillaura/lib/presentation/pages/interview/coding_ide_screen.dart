@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
@@ -22,9 +24,9 @@ class _CodingIDEScreenState extends State<CodingIDEScreen> {
   String _selectedLang = 'python';
   bool _loadingQuestion = true;
   bool _running = false;
-  bool _evaluating = false;
+  bool _submitting = false;
   Map<String, dynamic>? _runResult;
-  Map<String, dynamic>? _evalResult;
+  Map<String, dynamic>? _submitResult;
 
   // Timer
   bool _timerRunning = false;
@@ -57,12 +59,12 @@ class _CodingIDEScreenState extends State<CodingIDEScreen> {
       _selectedLang = lang;
       _codeController.text = starter[lang] ?? '// Write your solution here\n';
       _runResult = null;
-      _evalResult = null;
+      _submitResult = null;
     });
   }
 
   Future<void> _runCode() async {
-    setState(() { _running = true; _runResult = null; _evalResult = null; });
+    setState(() { _running = true; _runResult = null; _submitResult = null; });
     final tcs = List<Map<String, dynamic>>.from(_question?['test_cases'] ?? []);
     final result = await _service.runCode(
       code: _codeController.text,
@@ -74,14 +76,33 @@ class _CodingIDEScreenState extends State<CodingIDEScreen> {
   }
 
   Future<void> _submitCode() async {
-    setState(() { _evaluating = true; _runResult = null; });
-    await _runCode();
-    final eval = await _service.evaluateCode(
+    setState(() { _submitting = true; _runResult = null; _submitResult = null; });
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final result = await _service.submitCode(
       code: _codeController.text,
       language: _selectedLang,
       questionId: widget.questionId,
+      userId: uid,
     );
-    if (mounted) setState(() { _evaluating = false; _evalResult = eval; });
+    if (mounted) setState(() { _submitting = false; _submitResult = result; });
+
+    // Save to Firestore
+    if (uid != null) {
+      try {
+        await FirebaseFirestore.instance
+            .collection('users').doc(uid)
+            .collection('submissions').add({
+          'question_id': widget.questionId,
+          'question_title': result['question_title'] ?? widget.questionTitle,
+          'language': _selectedLang,
+          'code': _codeController.text,
+          'all_passed': result['all_passed'] ?? false,
+          'verdict': result['ai_review']?['verdict'] ?? 'Unknown',
+          'score': result['ai_review']?['score'] ?? 0,
+          'submitted_at': FieldValue.serverTimestamp(),
+        });
+      } catch (_) {}
+    }
     _scrollToBottom();
   }
 
@@ -155,16 +176,16 @@ class _CodingIDEScreenState extends State<CodingIDEScreen> {
               child: Column(children: [
                 _buildProblemPanel(),
                 _buildEditorPanel(),
-                if (_running || _evaluating) const Padding(
+                if (_running || _submitting) const Padding(
                   padding: EdgeInsets.all(20),
                   child: Row(children: [
                     SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary)),
                     SizedBox(width: 12),
-                    Text('Running code...', style: TextStyle(color: AppColors.textSecondary)),
+                    Text('Processing...', style: TextStyle(color: AppColors.textSecondary)),
                   ]),
                 ),
-                if (_runResult != null) _buildRunResults(),
-                if (_evalResult != null) _buildEvalResults(),
+                if (_runResult != null) _buildRunResults(_runResult!),
+                if (_submitResult != null) _buildSubmitResults(_submitResult!),
                 const SizedBox(height: 20),
               ]),
             ),
@@ -196,7 +217,6 @@ class _CodingIDEScreenState extends State<CodingIDEScreen> {
           child: Text(diff, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: diffColor)),
         ),
         const SizedBox(width: 10),
-        // Timer
         GestureDetector(
           onTap: _toggleTimer,
           child: Container(
@@ -213,7 +233,6 @@ class _CodingIDEScreenState extends State<CodingIDEScreen> {
           ),
         ),
         const SizedBox(width: 8),
-        // Quit
         GestureDetector(
           onTap: () => _quit(context),
           child: Container(
@@ -288,7 +307,6 @@ class _CodingIDEScreenState extends State<CodingIDEScreen> {
         border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
       ),
       child: Column(children: [
-        // Editor toolbar
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
@@ -301,7 +319,6 @@ class _CodingIDEScreenState extends State<CodingIDEScreen> {
             const SizedBox(width: 6),
             const Text('Code Editor', style: TextStyle(fontSize: 12, color: AppColors.textHint, fontWeight: FontWeight.w600)),
             const Spacer(),
-            // Language selector
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8)),
@@ -319,19 +336,13 @@ class _CodingIDEScreenState extends State<CodingIDEScreen> {
             ),
           ]),
         ),
-        // Code input
         SizedBox(
           height: 300,
           child: TextField(
             controller: _codeController,
             maxLines: null,
             expands: true,
-            style: const TextStyle(
-              fontFamily: 'monospace',
-              fontSize: 13,
-              color: Color(0xFFe2e8f0),
-              height: 1.6,
-            ),
+            style: const TextStyle(fontFamily: 'monospace', fontSize: 13, color: Color(0xFFe2e8f0), height: 1.6),
             decoration: const InputDecoration(
               contentPadding: EdgeInsets.all(14),
               border: InputBorder.none,
@@ -342,12 +353,9 @@ class _CodingIDEScreenState extends State<CodingIDEScreen> {
             ),
           ),
         ),
-        // Run / Submit buttons
         Container(
           padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.07))),
-          ),
+          decoration: BoxDecoration(border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.07)))),
           child: Row(children: [
             Expanded(
               child: GestureDetector(
@@ -366,14 +374,14 @@ class _CodingIDEScreenState extends State<CodingIDEScreen> {
             const SizedBox(width: 10),
             Expanded(
               child: GestureDetector(
-                onTap: _evaluating ? null : _submitCode,
+                onTap: _submitting ? null : _submitCode,
                 child: Container(
                   height: 40,
                   decoration: BoxDecoration(gradient: AppColors.primaryGradient, borderRadius: BorderRadius.circular(10)),
                   child: Center(child: Row(mainAxisSize: MainAxisSize.min, children: [
                     const Icon(Icons.upload_rounded, size: 16, color: Colors.white),
                     const SizedBox(width: 6),
-                    Text(_evaluating ? 'Checking...' : 'Submit', style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                    Text(_submitting ? 'Submitting...' : 'Submit', style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
                   ])),
                 ),
               ),
@@ -384,11 +392,11 @@ class _CodingIDEScreenState extends State<CodingIDEScreen> {
     );
   }
 
-  Widget _buildRunResults() {
-    final results = List<Map<String, dynamic>>.from(_runResult!['results'] ?? []);
-    final passed = (_runResult!['passed'] ?? 0) as int;
-    final total  = (_runResult!['total'] ?? 0) as int;
-    final allPassed = _runResult!['all_passed'] == true;
+  Widget _buildRunResults(Map<String, dynamic> result) {
+    final results = List<Map<String, dynamic>>.from(result['results'] ?? []);
+    final passed = (result['passed'] ?? 0) as int;
+    final total  = (result['total'] ?? 0) as int;
+    final allPassed = result['all_passed'] == true;
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -414,44 +422,119 @@ class _CodingIDEScreenState extends State<CodingIDEScreen> {
     );
   }
 
-  Widget _buildEvalResults() {
-    if (_evalResult == null) return const SizedBox.shrink();
-    final score = (_evalResult!['quality_score'] ?? 0) as int;
-    final timeC = _evalResult!['time_complexity'] ?? 'N/A';
-    final spaceC = _evalResult!['space_complexity'] ?? 'N/A';
-    final suggestions = List<String>.from(_evalResult!['suggestions'] ?? []);
+  Widget _buildSubmitResults(Map<String, dynamic> result) {
+    final allPassed = result['all_passed'] == true;
+    final testResults = List<Map<String, dynamic>>.from(result['test_results'] ?? []);
+    final passed = (result['passed'] ?? 0) as int;
+    final total = (result['total'] ?? 0) as int;
+    final ai = (result['ai_review'] as Map?)?.cast<String, dynamic>() ?? {};
+    final verdict = ai['verdict'] ?? (allPassed ? 'Accepted' : 'Wrong Answer');
+    final feedback = ai['feedback'] ?? '';
+    final timeC = ai['time_complexity'] ?? 'N/A';
+    final spaceC = ai['space_complexity'] ?? 'N/A';
+    final score = (ai['score'] ?? 0) as int;
 
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Code Analysis', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-        const SizedBox(height: 12),
-        Row(children: [
-          _EvalBadge(label: 'Time', value: timeC, color: AppColors.warning),
-          const SizedBox(width: 10),
-          _EvalBadge(label: 'Space', value: spaceC, color: AppColors.primary),
-          const SizedBox(width: 10),
-          _EvalBadge(label: 'Score', value: '$score/100', color: score >= 70 ? AppColors.success : AppColors.error),
-        ]),
-        if (suggestions.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          for (final s in suggestions) Padding(
-            padding: const EdgeInsets.only(bottom: 4),
+    final verdictColor = verdict == 'Accepted'
+        ? AppColors.success
+        : verdict == 'Incomplete'
+            ? AppColors.warning
+            : AppColors.error;
+
+    return Column(children: [
+      // Test results summary
+      if (testResults.isNotEmpty)
+        Container(
+          margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: allPassed ? AppColors.success.withValues(alpha: 0.08) : AppColors.error.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: allPassed ? AppColors.success.withValues(alpha: 0.25) : AppColors.error.withValues(alpha: 0.25)),
+          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Icon(allPassed ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                  color: allPassed ? AppColors.success : AppColors.error, size: 18),
+              const SizedBox(width: 8),
+              Text(allPassed ? 'All Test Cases Passed!' : '$passed/$total Test Cases Passed',
+                  style: TextStyle(color: allPassed ? AppColors.success : AppColors.error, fontWeight: FontWeight.w700, fontSize: 14)),
+            ]),
+            const SizedBox(height: 10),
+            for (final r in testResults) _TestCaseRow(result: r),
+          ]),
+        ),
+
+      // AI Review panel
+      Container(
+        margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [verdictColor.withValues(alpha: 0.08), AppColors.cardBg],
+            begin: Alignment.topLeft, end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: verdictColor.withValues(alpha: 0.3)),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          // Header
+          Row(children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: verdictColor.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: verdictColor.withValues(alpha: 0.4)),
+              ),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(verdict == 'Accepted' ? Icons.verified_rounded : Icons.auto_fix_high_rounded,
+                    size: 14, color: verdictColor),
+                const SizedBox(width: 6),
+                Text(verdict, style: TextStyle(color: verdictColor, fontWeight: FontWeight.w800, fontSize: 13)),
+              ]),
+            ),
+            const Spacer(),
+            const Icon(Icons.auto_awesome_rounded, size: 14, color: AppColors.textHint),
+            const SizedBox(width: 4),
+            const Text('AI Review', style: TextStyle(fontSize: 11, color: AppColors.textHint, fontWeight: FontWeight.w600)),
+          ]),
+          const SizedBox(height: 14),
+
+          // Complexity badges
+          Row(children: [
+            _EvalBadge(label: 'Time', value: timeC, color: AppColors.warning),
+            const SizedBox(width: 10),
+            _EvalBadge(label: 'Space', value: spaceC, color: AppColors.primary),
+            const SizedBox(width: 10),
+            _EvalBadge(label: 'Score', value: '$score/100', color: score >= 70 ? AppColors.success : AppColors.error),
+          ]),
+          const SizedBox(height: 14),
+
+          // AI Feedback
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(10),
+            ),
             child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Icon(Icons.lightbulb_outline_rounded, size: 14, color: AppColors.warning),
-              const SizedBox(width: 6),
-              Expanded(child: Text(s, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12))),
+              const Icon(Icons.lightbulb_outline_rounded, size: 15, color: AppColors.warning),
+              const SizedBox(width: 8),
+              Expanded(child: Text(feedback, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.5))),
             ]),
           ),
-        ],
-      ]),
-    );
+
+          if (result['user_id'] != null) ...[
+            const SizedBox(height: 10),
+            Row(children: [
+              const Icon(Icons.cloud_done_rounded, size: 12, color: AppColors.success),
+              const SizedBox(width: 4),
+              const Text('Saved to your profile', style: TextStyle(fontSize: 11, color: AppColors.success)),
+            ]),
+          ],
+        ]),
+      ),
+    ]);
   }
 }
 
@@ -479,7 +562,8 @@ class _TestCaseRow extends StatelessWidget {
           Text('Case ${result['case']}: ${passed ? 'Passed' : 'Failed'}',
               style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: passed ? AppColors.success : AppColors.error)),
           if (!passed) ...[
-            Text('Expected: ${result['expected']}', style: const TextStyle(fontSize: 10, color: AppColors.textHint, fontFamily: 'monospace')),
+            if ((result['expected'] ?? '').isNotEmpty)
+              Text('Expected: ${result['expected']}', style: const TextStyle(fontSize: 10, color: AppColors.textHint, fontFamily: 'monospace')),
             Text('Got: ${result['actual']}', style: const TextStyle(fontSize: 10, color: AppColors.textHint, fontFamily: 'monospace')),
           ],
           if ((result['error'] ?? '').isNotEmpty && !passed)
