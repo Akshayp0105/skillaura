@@ -4,6 +4,7 @@ import '../../domain/entities/job.dart';
 import '../../presentation/pages/auth/login_screen.dart';
 import '../../presentation/pages/auth/register_screen.dart';
 import '../../presentation/pages/dashboard/dashboard_screen.dart';
+import '../../presentation/pages/dashboard/improve_resume_chat_screen.dart';
 import '../../presentation/pages/interview/english_practice_screen.dart';
 import '../../presentation/pages/interview/interview_hub_screen.dart';
 import '../../presentation/pages/interview/coding_prep_screen.dart';
@@ -19,6 +20,7 @@ import '../../presentation/pages/jobs/jobs_screen.dart';
 import '../../presentation/pages/onboarding/onboarding_screen.dart';
 import '../../presentation/pages/onboarding/splash_screen.dart';
 import '../../presentation/pages/profile/profile_screen.dart';
+import '../../presentation/pages/profile/public_portfolio_screen.dart';
 import '../../presentation/pages/shell/main_shell.dart';
 import '../constants/app_constants.dart';
 
@@ -41,12 +43,25 @@ final GoRouter appRouter = GoRouter(
       path: AppConstants.routeRegister,
       builder: (context, state) => const RegisterScreen(),
     ),
+    GoRoute(
+      path: '/${AppConstants.routePortfolio}/:uid',
+      builder: (context, state) {
+        final uid = state.pathParameters['uid']!;
+        return PublicPortfolioScreen(uid: uid);
+      },
+    ),
     ShellRoute(
       builder: (context, state, child) => MainShell(child: child),
       routes: [
         GoRoute(
           path: '/${AppConstants.routeDashboard}',
           builder: (context, state) => const DashboardScreen(),
+          routes: [
+            GoRoute(
+              path: AppConstants.routeImproveResume,
+              builder: (context, state) => const ImproveResumeChatScreen(),
+            ),
+          ],
         ),
         GoRoute(
           path: '/${AppConstants.routeJobs}',

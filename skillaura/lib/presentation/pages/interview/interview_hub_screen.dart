@@ -1,10 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../domain/entities/user.dart';
+import '../../../services/user_service.dart';
 
-class InterviewHubScreen extends StatelessWidget {
+class InterviewHubScreen extends StatefulWidget {
   const InterviewHubScreen({super.key});
+
+  @override
+  State<InterviewHubScreen> createState() => _InterviewHubScreenState();
+}
+
+class _InterviewHubScreenState extends State<InterviewHubScreen> {
 
   static const List<_InterviewCard> _cards = [
     _InterviewCard(
@@ -72,7 +81,7 @@ class InterviewHubScreen extends StatelessWidget {
                 style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
               ),
               const SizedBox(height: 28),
-              _buildStatsRow(),
+              _buildLiveStatsRow(),
               const SizedBox(height: 28),
               Expanded(
                 child: ListView.separated(
@@ -89,17 +98,59 @@ class InterviewHubScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildStatsRow() {
+  Widget _buildLiveStatsRow() {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return _buildStaticStats('0', '0%', '0m');
+
+    return StreamBuilder<UserEntity?>(
+      stream: UserService().getUserStream(uid),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || snapshot.data == null) {
+          return _buildStaticStats('0', '0%', '0m');
+        }
+
+        final user = snapshot.data!;
+        final sessions = user.totalInterviewSessions.toString();
+        final avgScore = '${user.averageInterviewScore.round()}%';
+        final timeStr = _formatTime(user.totalInterviewTimeSeconds);
+
+        return _buildStaticStats(sessions, avgScore, timeStr);
+      },
+    );
+  }
+
+  String _formatTime(int seconds) {
+    if (seconds == 0) return '0m';
+    if (seconds < 60) return '< 1m';
+    
+    final minutes = seconds ~/ 60;
+    if (minutes < 60) {
+      return '${minutes}m';
+    }
+    
+    final hours = minutes ~/ 60;
+    final remainingMinutes = minutes % 60;
+    if (remainingMinutes == 0) {
+      return '${hours}h';
+    }
+    return '${hours}h ${remainingMinutes}m';
+  }
+
+  Widget _buildStaticStats(String sessions, String avgScore, String timeStr) {
     return Row(
       children: [
         _StatBox(
-            value: '8', label: 'Sessions', gradient: AppColors.primaryGradient),
+            value: sessions,
+            label: 'Sessions',
+            gradient: AppColors.primaryGradient),
         const SizedBox(width: 12),
         _StatBox(
-            value: '76%', label: 'Avg Score', gradient: AppColors.tealGradient),
+            value: avgScore,
+            label: 'Avg Score',
+            gradient: AppColors.tealGradient),
         const SizedBox(width: 12),
         _StatBox(
-            value: '3h',
+            value: timeStr,
             label: 'Practiced',
             gradient: AppColors.purpleGradient),
       ],

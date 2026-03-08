@@ -24,6 +24,11 @@ class UserService {
       'resumeBase64': '',
       'resumeName': '',
       'githubUsername': '',
+      'totalInterviewSessions': 0,
+      'averageInterviewScore': 0.0,
+      'totalInterviewTimeSeconds': 0,
+      'totalScoreAccumulated': 0.0,
+      'notificationsEnabled': false,
       'createdAt': FieldValue.serverTimestamp(),
     };
     await _usersCollection.doc(uid).set(userData);
@@ -46,6 +51,11 @@ class UserService {
         skills: List<String>.from(data['skills'] ?? []),
         resumeScore: (data['resumeScore'] ?? 0).toInt(),
         githubUsername: data['githubUsername'] ?? '',
+        totalInterviewSessions: (data['totalInterviewSessions'] ?? 0).toInt(),
+        averageInterviewScore: (data['averageInterviewScore'] ?? 0.0).toDouble(),
+        totalInterviewTimeSeconds: (data['totalInterviewTimeSeconds'] ?? 0).toInt(),
+        totalScoreAccumulated: (data['totalScoreAccumulated'] ?? 0.0).toDouble(),
+        notificationsEnabled: data['notificationsEnabled'] ?? false,
       );
     } catch (e) {
       return null;
@@ -100,5 +110,69 @@ Future<void> updateUser({
     if (updates.isNotEmpty) {
       await _usersCollection.doc(uid).update(updates);
     }
+  }
+
+  Stream<UserEntity?> getUserStream(String uid) {
+    return _usersCollection.doc(uid).snapshots().map((doc) {
+      if (!doc.exists) return null;
+      final data = doc.data() as Map<String, dynamic>;
+      return UserEntity(
+        id: data['id'] ?? '',
+        fullName: data['fullName'] ?? '',
+        email: data['email'] ?? '',
+        university: data['university'] ?? '',
+        avatarUrl: data['avatarUrl'] ?? '',
+        backgroundImageUrl: data['backgroundImageUrl'] ?? '',
+        skills: List<String>.from(data['skills'] ?? []),
+        resumeScore: (data['resumeScore'] ?? 0).toInt(),
+        githubUsername: data['githubUsername'] ?? '',
+        totalInterviewSessions: (data['totalInterviewSessions'] ?? 0).toInt(),
+        averageInterviewScore: (data['averageInterviewScore'] ?? 0.0).toDouble(),
+        totalInterviewTimeSeconds: (data['totalInterviewTimeSeconds'] ?? 0).toInt(),
+        totalScoreAccumulated: (data['totalScoreAccumulated'] ?? 0.0).toDouble(),
+        notificationsEnabled: data['notificationsEnabled'] ?? false,
+      );
+    });
+  }
+
+  Future<void> updateInterviewStats({
+    required String uid,
+    required int additionalTimeSeconds,
+    double? sessionScore,
+    bool isNewSession = false,
+  }) async {
+    try {
+      final doc = await _usersCollection.doc(uid).get();
+      if (!doc.exists) return;
+      
+      final data = doc.data() as Map<String, dynamic>;
+      
+      int currentSessions = (data['totalInterviewSessions'] ?? 0).toInt();
+      double currentScoreAccumulated = (data['totalScoreAccumulated'] ?? 0.0).toDouble();
+      
+      if (isNewSession) currentSessions += 1;
+      if (sessionScore != null) currentScoreAccumulated += sessionScore;
+      
+      double newAvgScore = currentSessions > 0 ? (currentScoreAccumulated / currentSessions) : 0.0;
+      
+      final Map<String, dynamic> updates = {
+        'totalInterviewTimeSeconds': FieldValue.increment(additionalTimeSeconds),
+        'totalInterviewSessions': currentSessions,
+        'totalScoreAccumulated': currentScoreAccumulated,
+        'averageInterviewScore': newAvgScore,
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+      
+      await _usersCollection.doc(uid).update(updates);
+    } catch (e) {
+      // Ignore errors for non-critical stats updates
+    }
+  }
+
+  Future<void> toggleNotifications(String uid, bool enabled) async {
+    await _usersCollection.doc(uid).update({
+      'notificationsEnabled': enabled,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
   }
 }

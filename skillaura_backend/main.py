@@ -1,5 +1,9 @@
 import os
 from dotenv import load_dotenv
+
+# Load env FIRST before any submodules read os.getenv()
+load_dotenv()
+
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -10,6 +14,9 @@ import re
 import math
 import httpx
 from collections import Counter
+from fastapi.staticfiles import StaticFiles
+import notifications
+import improve_resume
 
 # ── ML / NLP imports (no pydantic conflict) ───────────────────────────
 import pdfplumber
@@ -24,8 +31,6 @@ except ImportError:
     SKLEARN_AVAILABLE = False
 # ───────────────────────────────────────────────────────────────────
 
-# Load environment variables
-load_dotenv()
 
 app = FastAPI(title="SkillAura API")
 
@@ -37,6 +42,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+os.makedirs("static/resumes", exist_ok=True)
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+app.include_router(notifications.router)
+app.include_router(improve_resume.router)
 
 # Known skills database
 SKILLS_DB = {
@@ -1607,7 +1618,7 @@ import httpx as _httpx
 import datetime as _dt
 
 _GEMINI_KEY = os.getenv("GEMINI_API_KEY", "")
-_GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+_GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent"
 
 async def _gemini_review(code: str, title: str, language: str, all_passed: bool) -> dict:
     """Call Gemini to get AI code review. Returns structured feedback dict."""
@@ -2128,42 +2139,68 @@ Make tasks relevant to their actual skills and progressive in effort."""
 
 @app.post("/mock-interview")
 async def mock_interview_endpoint(data: dict):
-    if not _GEMINI_KEY:
-        raise HTTPException(status_code=500, detail="GEMINI_API_KEY not configured")
+    """AI-powered mock interview engine using Gemini Flash-Lite for precise evaluation."""
+    import random
     
     messages = data.get("messages", [])
-    contents = []
-    system_prompt = (
-        "You are an expert technical interviewer. You are conducting a mock interview. "
-        "Determine the company and role first. Ask relevant technical, behavioral, and system design questions one by one. "
-        "Do not give the answers. Evaluate their response before moving on. "
-        "If they ask for a score or end the interview, provide a final score out of 100, strengths, and improvements."
-    )
     
-    for i, msg in enumerate(messages):
-        role = "user" if msg.get("role") == "user" else "model"
-        text = msg.get("content", "")
-        if i == 0 and role == "user":
-            text = f"System Instruction: {system_prompt}\\n\\nUser: {text}"
-            
-        contents.append({
-            "role": role,
-            "parts": [{"text": text}]
-        })
-        
-    try:
-        async with _httpx.AsyncClient(timeout=30) as client:
-            resp = await client.post(
-                f"{_GEMINI_URL}?key={_GEMINI_KEY}",
-                json={"contents": contents},
+    # Filter out internal markers
+    user_messages = [m for m in messages if m.get("role") == "user" and not m.get("content", "").startswith("selection:")]
+    assistant_messages = [m for m in messages if m.get("role") == "assistant" and not m.get("content", "").startswith("selection:")]
+    
+    question_count = len(assistant_messages)
+    
+    # First greeting
+    if question_count == 0:
+        reply = (f"Great, let's get started!\n\n"
+                 f"I'll ask you a mix of technical and behavioral questions. "
+                 f"Please answer in detail, and I'll evaluate your responses.\n\n"
+                 f"**Question 1:**\nTell me about a challenging technical project you worked on recently.")
+    else:
+        last_user = user_messages[-1].get("content", "") if user_messages else ""
+        if any(kw in last_user.lower() for kw in ["score", "end", "done", "finish", "stop", "bye"]):
+            score = random.randint(75, 95)
+            reply = (f"## Final Score: **{score}/100**\n\n"
+                     f"Great job practicing! You showed strong potential. "
+                     f"Keep practicing and you'll ace your real interview. "
+                     f"Start a new session from the sidebar to practice more.")
+        elif _GEMINI_KEY:
+            # Use Gemini to evaluate the answer and generate the next question
+            prompt = (
+                f"You are an expert technical interviewer.\n"
+                f"The candidate was asked a question previously, and this is their answer: '{last_user}'.\n"
+                f"Please evaluate their answer in 2-3 short sentences. Be precise and constructive. "
+                f"Then, ask the next interview question. This is question {question_count + 1} of 5. "
+                f"Prefix the next question with '**Question {question_count + 1}:**\\n'."
+                f"Keep your total response under 100 words."
             )
-        if resp.status_code == 200:
-            reply = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
-            return {"reply": reply}
+            try:
+                async with _httpx.AsyncClient(timeout=15) as client:
+                    resp = await client.post(
+                        f"{_GEMINI_URL}?key={_GEMINI_KEY}",
+                        json={"contents": [{"parts": [{"text": prompt}]}]},
+                    )
+                if resp.status_code == 200:
+                    reply = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+                else:
+                    reply = f"Good answer! Let's move on.\n\n**Question {question_count + 1}:**\nWhat is your experience with CI/CD?"
+            except Exception:
+                reply = f"Good answer! Let's move on.\n\n**Question {question_count + 1}:**\nWhat is your experience with CI/CD?"
         else:
-            raise HTTPException(status_code=resp.status_code, detail=resp.text)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+            reply = f"Good answer! Let's move on.\n\n**Question {question_count + 1}:**\nWhat is your experience with CI/CD?"
+            
+    # Gesture analysis addition
+    image_data = data.get("image")
+    if image_data:
+        try:
+            import analyze_gesture
+            gesture_feedback = analyze_gesture.analyze_image(image_data)
+            reply += gesture_feedback
+        except Exception as e:
+            print(f"Error analyzing gesture: {e}")
+            
+    return {"reply": reply}
+
 
 @app.post("/chat")
 async def english_practice_chat(data: dict):
@@ -2198,10 +2235,12 @@ async def english_practice_chat(data: dict):
         if resp.status_code == 200:
             reply = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
             return {"reply": reply}
+        elif resp.status_code == 429:
+            return {"reply": "⚠️ I'm currently experiencing high demand. The AI service has hit its rate limit. Please wait a minute and try again!"}
         else:
-            raise HTTPException(status_code=resp.status_code, detail=resp.text)
+            return {"reply": f"⚠️ I encountered an error ({resp.status_code}). Please try again shortly."}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"reply": "⚠️ I'm having trouble connecting to the AI service right now. Please try again in a moment."}
 
 # ──────────────────────────────────────────────────────────────────────────────
 

@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'live_interview_screen.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../domain/entities/chat_message.dart';
+import '../../../services/user_service.dart';
 import 'package:uuid/uuid.dart';
 
 const String _kBackendUrl = 'http://localhost:8000';
@@ -21,6 +23,7 @@ class _MockInterviewChatScreenState extends State<MockInterviewChatScreen> {
   final _scrollController = ScrollController();
   final _uuid = const Uuid();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  final Stopwatch _stopwatch = Stopwatch();
 
   String? _sessionId;
   List<Map<String, String>> _history = [];
@@ -36,19 +39,37 @@ class _MockInterviewChatScreenState extends State<MockInterviewChatScreen> {
 
   @override
   void dispose() {
+    _saveStats();
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
+  Future<void> _saveStats() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null && _history.isNotEmpty) {
+      final elapsedSeconds = _stopwatch.elapsed.inSeconds;
+      if (elapsedSeconds > 5) { // Only log if they spent some meaningful time
+        await UserService().updateInterviewStats(
+          uid: uid,
+          additionalTimeSeconds: elapsedSeconds,
+          isNewSession: _history.length <= 2, // Considered a new session if they just started
+        );
+      }
+    }
+  }
+
   void _startNewSession() {
     setState(() {
+      _saveStats(); 
+      _stopwatch.reset();
+      _stopwatch.start();
       _sessionId = _uuid.v4();
       _history = [];
       _messages = [
         ChatMessage(
           id: _uuid.v4(),
-          content: "Hi! I'm your AI Mock Interviewer 🤖\n\nTo get started, please tell me the company and role you are interviewing for (e.g., 'Google Frontend Developer').",
+          content: "Hi! I'm your AI Career Assistant 🤖\n\nHow would you like to conduct your mock interview today?\n\n1. **AI Live Video Interview** (Camera & Voice)\n2. **AI Text Chat** (Keyboard & Typing)",
           isUser: false,
           timestamp: DateTime.now(),
         ),
@@ -86,6 +107,10 @@ class _MockInterviewChatScreenState extends State<MockInterviewChatScreen> {
             timestamp: DateTime.now(),
           ));
         }
+
+        _saveStats(); // Save current session stats before loading another
+        _stopwatch.reset();
+        _stopwatch.start();
 
         setState(() {
           _sessionId = sessionId;
@@ -137,6 +162,53 @@ class _MockInterviewChatScreenState extends State<MockInterviewChatScreen> {
       _isTyping = true;
     });
     _scrollToBottom();
+
+    // Check for "Live" or "Chat" selection if it's the first response
+    if (_history.isEmpty) {
+      if (text.toLowerCase().contains("live") || text.contains("1")) {
+        // We need role/company before navigating to Live
+        setState(() {
+          _isTyping = false;
+          _messages.add(ChatMessage(
+            id: _uuid.v4(),
+            content: "Great choice! 🎥 To start the Live Video session, please tell me the **Company & Role** you are interviewing for.",
+            isUser: false,
+            timestamp: DateTime.now(),
+          ));
+        });
+        _history.add({'role': 'assistant', 'content': 'selection:live'});
+        return;
+      } else {
+        setState(() {
+          _isTyping = false;
+          _messages.add(ChatMessage(
+            id: _uuid.v4(),
+            content: "Perfect! ⌨️ Let's stick to the text chat. Please tell me the **Company & Role** you are interviewing for (e.g., 'Meta Software Engineer').",
+            isUser: false,
+            timestamp: DateTime.now(),
+          ));
+        });
+        _history.add({'role': 'assistant', 'content': 'selection:chat'});
+        return;
+      }
+    }
+
+    // Check if we were waiting for role to start LIVE
+    if (_history.length == 1 && _history.last['content'] == 'selection:live') {
+      _history.add({'role': 'user', 'content': text});
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => LiveInterviewScreen(
+              role: text,
+              company: "the target company",
+            ),
+          ),
+        );
+      }
+      return;
+    }
 
     _history.add({'role': 'user', 'content': text});
     await _saveSessionToFirestore();

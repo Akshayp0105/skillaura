@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../services/coding_service.dart';
+import '../../../services/user_service.dart';
 
 class MockTestExamScreen extends StatefulWidget {
   final String domainId;
@@ -55,7 +57,24 @@ class _MockTestExamScreenState extends State<MockTestExamScreen> {
     });
   }
 
-  void _submit() { _timer?.cancel(); setState(() => _submitted = true); }
+  void _submit() async {
+    _timer?.cancel();
+    setState(() => _submitted = true);
+
+    // Save stats
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      final elapsedSeconds = (widget.durationMinutes * 60) - _secondsLeft;
+      final totalQuestions = _questions.length;
+      final finalScore = totalQuestions > 0 ? (_score / totalQuestions) * 100 : 0.0;
+      await UserService().updateInterviewStats(
+        uid: uid,
+        additionalTimeSeconds: elapsedSeconds,
+        sessionScore: finalScore,
+        isNewSession: true,
+      );
+    }
+  }
 
   int get _score {
     int s = 0;

@@ -1,0 +1,7 @@
+I've reviewed your resume and it seems you're targeting a **React Developer** role. Your current skills include AWS, C++, Dart, Flutter, Java, Python, and Scala.
+
+To provide a truly tailored critique for a React Developer role, I need to understand how your experience aligns with the typical requirements for such a position. For example, are you proficient in JavaScript, HTML, CSS, and modern React concepts like Hooks, Context API, and state management libraries (e.g., Redux, Zustand)? Do you have experience with build tools like Webpack or Vite, or testing frameworks like Jest and React Testing Library?
+
+Based on your current skill set, I can see some foundational programming languages (C++, Java, Python, Scala) and cloud experience (AWS), which are valuable. However, to be a strong candidate for a React Developer role, I'd be looking for specific front-end technologies and frameworks.
+
+Would you like me to generate a complete, ATS-friendly resume based on these improvements?

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../services/user_service.dart';
 import '../../../services/resume_service.dart';
@@ -959,6 +960,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const SizedBox(height: 24),
                 _buildSkillGapSection(),
                 const SizedBox(height: 32),
+                if (_githubUsername != null && _resumeUploaded)
+                  _buildGeneratePortfolioButton(),
+                if (_githubUsername == null || !_resumeUploaded)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 20),
+                    child: Text(
+                      'Upload resume & connect GitHub to generate your public portfolio.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: AppColors.textHint, fontSize: 12),
+                    ),
+                  ),
+                const SizedBox(height: 32),
               ]),
             ),
           ),
@@ -1481,25 +1494,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ],
             ),
             const SizedBox(height: 16),
-          ],
 
-          // ── Level legend ──────────────────────────────────────────────
-          if (_skillGapAnalysis != null) ...[
-            Row(
+            // ── Level legend ──────────────────────────────────────────────
+            const Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                _LegendDot(color: const Color(0xFFF44336), label: 'Missing'),
-                const SizedBox(width: 8),
-                _LegendDot(color: const Color(0xFFFF9800), label: 'Low'),
-                const SizedBox(width: 8),
-                _LegendDot(color: const Color(0xFFFFC107), label: 'Medium'),
-                const SizedBox(width: 8),
-                _LegendDot(color: const Color(0xFF8BC34A), label: 'Interm.'),
-                const SizedBox(width: 8),
-                _LegendDot(color: const Color(0xFF4CAF50), label: 'Pro'),
+                _LegendDot(color: Color(0xFFF44336), label: 'Missing'),
+                SizedBox(width: 8),
+                _LegendDot(color: Color(0xFFFF9800), label: 'Low'),
+                SizedBox(width: 8),
+                _LegendDot(color: Color(0xFFFFC107), label: 'Medium'),
+                SizedBox(width: 8),
+                _LegendDot(color: Color(0xFF8BC34A), label: 'Interm.'),
+                SizedBox(width: 8),
+                _LegendDot(color: Color(0xFF4CAF50), label: 'Pro'),
               ],
             ),
             const SizedBox(height: 10),
+            
             // ── Skill rows ──────────────────────────────────────────────
             Column(
               children: _skillGapAnalysis!.gapAnalysis
@@ -1510,7 +1522,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ))
                   .toList(),
             ),
-          ] else
+
+            // Missing Skills Section
+            if (_skillGapAnalysis!.missingSkills.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              const Text(
+                'Skills to Learn:',
+                style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: _skillGapAnalysis!.missingSkills.map((skill) {
+                  return Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.error.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                          color: AppColors.error.withValues(alpha: 0.3)),
+                    ),
+                    child: Text(
+                      skill,
+                      style:
+                          const TextStyle(color: AppColors.error, fontSize: 11),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+          ] else ...[
             Container(
               height: 180,
               alignment: Alignment.center,
@@ -1531,42 +1577,57 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
             ),
-
-          // Missing Skills Section
-          if (_skillGapAnalysis != null &&
-              _skillGapAnalysis!.missingSkills.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            const Text(
-              'Skills to Learn:',
-              style: TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: _skillGapAnalysis!.missingSkills.map((skill) {
-                return Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.error.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                        color: AppColors.error.withValues(alpha: 0.3)),
-                  ),
-                  child: Text(
-                    skill,
-                    style:
-                        const TextStyle(color: AppColors.error, fontSize: 11),
-                  ),
-                );
-              }).toList(),
-            ),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildGeneratePortfolioButton() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      child: GestureDetector(
+        onTap: () {
+          final uid = FirebaseAuth.instance.currentUser?.uid;
+          if (uid != null) {
+            context.go('/portfolio/$uid');
+          }
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF6C63FF), Color(0xFFFF6584)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFFF6584).withValues(alpha: 0.3),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.public, color: Colors.white, size: 22),
+              SizedBox(width: 8),
+              Text(
+                'View Public Portfolio',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

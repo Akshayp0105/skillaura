@@ -1,0 +1,17 @@
+﻿Analyzing profile_screen.dart...
+
+warning - profile_screen.dart:43:16 - The value of the field '_jobRoleSuggestions' isn't used. Try removing the field, or using it. - unused_field
+warning - profile_screen.dart:44:8 - The value of the field '_isSearchingJobRoles' isn't used. Try removing the field, or using it. - unused_field
+warning - profile_screen.dart:45:8 - The value of the field '_showJobRoleSuggestions' isn't used. Try removing the field, or using it. - unused_field
+warning - profile_screen.dart:46:8 - The value of the field '_isCustomJobRole' isn't used. Try removing the field, or using it. - unused_field
+   info - profile_screen.dart:12:8 - The import of '../../../services/github_service.dart' is unnecessary because all of the used elements are also provided by the import of '../../../services/github_service.dart'. Try removing the import directive. - unnecessary_import
+   info - profile_screen.dart:43:16 - The private field _jobRoleSuggestions could be 'final'. Try making the field 'final'. - prefer_final_fields
+   info - profile_screen.dart:44:8 - The private field _isSearchingJobRoles could be 'final'. Try making the field 'final'. - prefer_final_fields
+   info - profile_screen.dart:45:8 - The private field _showJobRoleSuggestions could be 'final'. Try making the field 'final'. - prefer_final_fields
+   info - profile_screen.dart:46:8 - The private field _isCustomJobRole could be 'final'. Try making the field 'final'. - prefer_final_fields
+   info - profile_screen.dart:1181:23 - Use 'const' with the constructor to improve performance. Try adding the 'const' keyword to the constructor invocation. - prefer_const_constructors
+   info - profile_screen.dart:1183:32 - Use 'const' with the constructor to improve performance. Try adding the 'const' keyword to the constructor invocation. - prefer_const_constructors
+   info - profile_screen.dart:1848:23 - Use 'const' with the constructor to improve performance. Try adding the 'const' keyword to the constructor invocation. - prefer_const_constructors
+   info - profile_screen.dart:1869:23 - Use 'const' with the constructor to improve performance. Try adding the 'const' keyword to the constructor invocation. - prefer_const_constructors
+
+13 issues found.

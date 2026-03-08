@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../services/coding_service.dart';
+import '../../../services/user_service.dart';
 
 class CodingIDEScreen extends StatefulWidget {
   final String questionId;
@@ -89,6 +90,9 @@ class _CodingIDEScreenState extends State<CodingIDEScreen> {
     // Save to Firestore
     if (uid != null) {
       try {
+        final aiReview = result['ai_review']?['score'] ?? result['ai_review']?['quality_score'] ?? 0;
+        final score = aiReview is int ? aiReview : double.tryParse(aiReview.toString())?.toInt() ?? 0;
+
         await FirebaseFirestore.instance
             .collection('users').doc(uid)
             .collection('submissions').add({
@@ -98,9 +102,24 @@ class _CodingIDEScreenState extends State<CodingIDEScreen> {
           'code': _codeController.text,
           'all_passed': result['all_passed'] ?? false,
           'verdict': result['ai_review']?['verdict'] ?? 'Unknown',
-          'score': result['ai_review']?['score'] ?? 0,
+          'score': score,
           'submitted_at': FieldValue.serverTimestamp(),
         });
+
+        // Update overall interview stats
+        await UserService().updateInterviewStats(
+          uid: uid,
+          additionalTimeSeconds: _seconds,
+          sessionScore: score.toDouble(),
+          isNewSession: true,
+        );
+
+        // Reset timer after submission so they don't double dip seconds if they submit again
+        if (mounted) {
+          setState(() {
+            _seconds = 0;
+          });
+        }
       } catch (_) {}
     }
     _scrollToBottom();

@@ -11,6 +11,8 @@ class AppConstants {
   static const String routeRegister = '/register';
   static const String routeShell = '/home';
   static const String routeDashboard = 'dashboard';
+  static const String routeImproveResume = 'improve-resume';
+  static const String routePortfolio = 'portfolio';
   static const String routeJobs = 'jobs';
   static const String routeJobDetail = 'job-detail';
   static const String routeInterviewHub = 'interview';

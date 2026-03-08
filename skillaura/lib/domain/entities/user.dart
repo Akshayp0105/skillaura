@@ -8,6 +8,11 @@ class UserEntity {
   final List<String> skills;
   final int resumeScore;
   final String githubUsername;
+  final int totalInterviewSessions;
+  final double averageInterviewScore;
+  final int totalInterviewTimeSeconds;
+  final double totalScoreAccumulated;
+  final bool notificationsEnabled;
 
   const UserEntity({
     required this.id,
@@ -19,6 +24,11 @@ class UserEntity {
     required this.skills,
     required this.resumeScore,
     this.githubUsername = '',
+    this.totalInterviewSessions = 0,
+    this.averageInterviewScore = 0.0,
+    this.totalInterviewTimeSeconds = 0,
+    this.totalScoreAccumulated = 0.0,
+    this.notificationsEnabled = false,
   });
 
   UserEntity copyWith({
@@ -31,6 +41,11 @@ class UserEntity {
     List<String>? skills,
     int? resumeScore,
     String? githubUsername,
+    int? totalInterviewSessions,
+    double? averageInterviewScore,
+    int? totalInterviewTimeSeconds,
+    double? totalScoreAccumulated,
+    bool? notificationsEnabled,
   }) {
     return UserEntity(
       id: id ?? this.id,
@@ -42,6 +57,11 @@ class UserEntity {
       skills: skills ?? this.skills,
       resumeScore: resumeScore ?? this.resumeScore,
       githubUsername: githubUsername ?? this.githubUsername,
+      totalInterviewSessions: totalInterviewSessions ?? this.totalInterviewSessions,
+      averageInterviewScore: averageInterviewScore ?? this.averageInterviewScore,
+      totalInterviewTimeSeconds: totalInterviewTimeSeconds ?? this.totalInterviewTimeSeconds,
+      totalScoreAccumulated: totalScoreAccumulated ?? this.totalScoreAccumulated,
+      notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
     );
   }
 }

@@ -78,6 +78,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   SliverAppBar _buildAppBar(BuildContext context, String name) {
+    final currentUser = FirebaseAuth.instance.currentUser;
     return SliverAppBar(
       floating: true,
       pinned: false,
@@ -116,10 +117,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Text('$_streak', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13)),
               ]),
             ),
-          Container(
-            width: 42, height: 42,
-            decoration: BoxDecoration(gradient: AppColors.primaryGradient, borderRadius: BorderRadius.circular(12)),
-            child: const Icon(Icons.notifications_none_rounded, color: Colors.white, size: 22),
+          GestureDetector(
+            onTap: () async {
+              if (currentUser != null && _user != null) {
+                final newValue = !(_user!.notificationsEnabled);
+                await _authService.userService.toggleNotifications(currentUser.uid, newValue);
+                setState(() {
+                  _user = _user!.copyWith(notificationsEnabled: newValue);
+                });
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text(newValue ? 'Live Notifications Enabled 🔔' : 'Notifications Disabled 🔕'),
+                    backgroundColor: newValue ? AppColors.success : AppColors.surfaceVariant,
+                    duration: const Duration(seconds: 2),
+                  ));
+                }
+              }
+            },
+            child: Container(
+              width: 42, height: 42,
+              decoration: BoxDecoration(
+                gradient: (_user?.notificationsEnabled == true) ? AppColors.primaryGradient : null,
+                color: (_user?.notificationsEnabled != true) ? AppColors.surfaceVariant : null,
+                borderRadius: BorderRadius.circular(12)
+              ),
+              child: Icon(
+                (_user?.notificationsEnabled == true) ? Icons.notifications_active_rounded : Icons.notifications_none_rounded, 
+                color: (_user?.notificationsEnabled == true) ? Colors.white : AppColors.textPrimary, 
+                size: 22
+              ),
+            ),
           ),
         ],
       ),
@@ -167,10 +194,13 @@ class _ResumeScoreCard extends StatelessWidget {
           const Text('Your resume is Good. Add more project details and quantify achievements.',
               style: TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.5)),
           const SizedBox(height: 14),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(gradient: AppColors.primaryGradient, borderRadius: BorderRadius.circular(8)),
-            child: const Text('✨ Improve Score', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+          GestureDetector(
+            onTap: () => context.go('/${AppConstants.routeDashboard}/${AppConstants.routeImproveResume}'),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(gradient: AppColors.primaryGradient, borderRadius: BorderRadius.circular(8)),
+              child: const Text('✨ Improve Score', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+            ),
           ),
         ])),
       ]),

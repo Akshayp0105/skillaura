@@ -41,6 +41,28 @@ class ApiService {
     }
   }
 
+  Future<bool> sendNotification({
+    required String email,
+    required String subject,
+    required String body,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/send-notification'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'email': email,
+          'subject': subject,
+          'body': body,
+        }),
+      ).timeout(const Duration(seconds: 15));
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Error sending notification $e');
+      return false;
+    }
+  }
+
   // ================= GITHUB ANALYSIS =================
 
   /// Analyze GitHub profile
