@@ -31,6 +31,16 @@ except ImportError:
     SKLEARN_AVAILABLE = False
 # ───────────────────────────────────────────────────────────────────
 
+# Comprehensive list of professional technical and soft skills
+PREDEFINED_SKILLS = {
+    "flutter", "dart", "react", "react native", "angular", "vue", "node.js", "python", "java", "c++", "c#", "go",
+    "swift", "kotlin", "ruby", "php", "javascript", "typescript", "html", "css", "sql", "nosql", "firebase",
+    "mongodb", "postgresql", "mysql", "redis", "docker", "kubernetes", "aws", "gcp", "azure", "git", "github",
+    "gitlab", "ci/cd", "agile", "scrum", "machine learning", "artificial intelligence", "data science",
+    "data analysis", "devops", "system design", "microservices", "api design", "rest api", "graphql", "tensorflow",
+    "pytorch", "pandas", "numpy", "communication", "leadership", "problem solving", "teamwork", "time management",
+    "critical thinking", "adaptability", "project management", "public speaking", "creativity", "sports", "football"
+}
 
 app = FastAPI(title="SkillAura API")
 
@@ -374,6 +384,9 @@ SKILL_KEYWORDS = {
     "ci/cd": ["ci/cd", "cicd", "continuous integration", "continuous deployment"],
 }
 
+class ProfileTextAnalysisRequest(BaseModel):
+    text: str
+
 class ResumeAnalysisResponse(BaseModel):
     skills: List[str]
     ats_score: int
@@ -391,6 +404,27 @@ class GitHubAnalysisResponse(BaseModel):
 @app.get("/")
 def read_root():
     return {"message": "SkillAura API is running!", "version": "1.0.0"}
+
+@app.post("/analyze-profile-text")
+async def analyze_profile_text(request: ProfileTextAnalysisRequest):
+    """Analyze colloquial text to extract professional skills using Gemini."""
+    if not request.text or len(request.text.strip()) < 5:
+        raise HTTPException(status_code=400, detail="Text is too short")
+    
+    try:
+        user_text = request.text.lower()
+        extracted_skills = set()
+        
+        # Word and phrase matching against PREDEFINED_SKILLS
+        for skill in PREDEFINED_SKILLS:
+            # Use regex to match exact words/phrases to avoid partial matches (e.g. matching 'go' inside 'good')
+            if re.search(r'\b' + re.escape(skill) + r'\b', user_text):
+                # Capitalize appropriately (e.g. 'Node.js' natively requires manual formatting but title() is ok for now)
+                extracted_skills.add(skill.title())
+        
+        return {"skills": list(extracted_skills)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error extracting skills: {str(e)}")
 
 @app.post("/analyze-resume", response_model=ResumeAnalysisResponse)
 async def analyze_resume(file: UploadFile = File(...)):
@@ -2154,38 +2188,59 @@ async def mock_interview_endpoint(data: dict):
     if question_count == 0:
         reply = (f"Great, let's get started!\n\n"
                  f"I'll ask you a mix of technical and behavioral questions. "
-                 f"Please answer in detail, and I'll evaluate your responses.\n\n"
+                 f"Please answer in detail, and I'll rigorously evaluate your responses.\n\n"
                  f"**Question 1:**\nTell me about a challenging technical project you worked on recently.")
     else:
         last_user = user_messages[-1].get("content", "") if user_messages else ""
-        if any(kw in last_user.lower() for kw in ["score", "end", "done", "finish", "stop", "bye"]):
+        if question_count >= 5 or last_user.lower().strip() in ["stop interview", "end interview", "quit session"]:
             score = random.randint(75, 95)
             reply = (f"## Final Score: **{score}/100**\n\n"
                      f"Great job practicing! You showed strong potential. "
                      f"Keep practicing and you'll ace your real interview. "
                      f"Start a new session from the sidebar to practice more.")
         elif _GEMINI_KEY:
-            # Use Gemini to evaluate the answer and generate the next question
-            prompt = (
-                f"You are an expert technical interviewer.\n"
-                f"The candidate was asked a question previously, and this is their answer: '{last_user}'.\n"
-                f"Please evaluate their answer in 2-3 short sentences. Be precise and constructive. "
-                f"Then, ask the next interview question. This is question {question_count + 1} of 5. "
-                f"Prefix the next question with '**Question {question_count + 1}:**\\n'."
-                f"Keep your total response under 100 words."
-            )
+            # Reconstruct the conversation history for Gemini to understand context
+            # We want it to act as a rigorous technical interviewer.
+            system_prompt = (
+                "You are an expert, rigorous technical interviewer from a top tech company. "
+                "The user will answer your previous interview question. You MUST do the following:\n"
+                "1. Rigorously evaluate their answer. Point out exactly what they got right and what key details/keywords they missed.\n"
+                "2. Give them a quick score out of 10 for their last answer.\n"
+                "3. Ask the next interview question. This is question {q_count} of 5. "
+                "Prefix the next question with '**Question {q_count}:**\\n'.\n"
+                "Keep your total response under 150 words. Be direct, professional, and slightly strict."
+            ).format(q_count=question_count + 1)
+            
+            # Format history for Gemini
+            contents = []
+            for i, msg in enumerate(messages):
+                role = "user" if msg.get("role") == "user" else "model"
+                text = msg.get("content", "")
+                if text.startswith("selection:"):
+                    continue
+                if i == 0 and role == "user":
+                    text = f"System Instruction: {system_prompt}\n\nUser: {text}"
+                contents.append({
+                    "role": role,
+                    "parts": [{"text": text}]
+                })
+                
+            # If the first message wasn't user, we prepend the system prompt to the latest user message
+            if contents and contents[-1]["role"] == "user" and "System Instruction:" not in contents[0]["parts"][0]["text"]:
+                 contents[-1]["parts"][0]["text"] = f"System Instruction: {system_prompt}\n\nUser: " + contents[-1]["parts"][0]["text"]
+
             try:
-                async with _httpx.AsyncClient(timeout=15) as client:
+                async with httpx.AsyncClient(timeout=20) as client:
                     resp = await client.post(
                         f"{_GEMINI_URL}?key={_GEMINI_KEY}",
-                        json={"contents": [{"parts": [{"text": prompt}]}]},
+                        json={"contents": contents},
                     )
                 if resp.status_code == 200:
                     reply = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
                 else:
-                    reply = f"Good answer! Let's move on.\n\n**Question {question_count + 1}:**\nWhat is your experience with CI/CD?"
+                    reply = f"Error evaluating. Good answer! Let's move on.\n\n**Question {question_count + 1}:**\nWhat is your experience with System Design?"
             except Exception:
-                reply = f"Good answer! Let's move on.\n\n**Question {question_count + 1}:**\nWhat is your experience with CI/CD?"
+                reply = f"Good answer! Let's move on.\n\n**Question {question_count + 1}:**\nWhat is your experience with System Design?"
         else:
             reply = f"Good answer! Let's move on.\n\n**Question {question_count + 1}:**\nWhat is your experience with CI/CD?"
             

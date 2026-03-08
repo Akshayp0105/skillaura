@@ -160,6 +160,27 @@ class ApiService {
     }
   }
 
+  // ================= PROFILE TEXT ANALYSIS =================
+
+  /// Analyze profile text to extract skills
+  Future<List<String>?> analyzeProfileText(String text) async {
+    try {
+      final response = await _client.post(
+        Uri.parse('$_baseUrl/analyze-profile-text'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'text': text}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return List<String>.from(data['skills'] ?? []);
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   void dispose() {
     _client.close();
   }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../../../core/theme/app_theme.dart';
 import '../../../services/user_service.dart';
 import '../../../services/resume_service.dart';
@@ -60,6 +61,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // ATS breakdown from ML engine (for pros/cons card)
   Map<String, dynamic> _breakdown = {};
+
+  // Speech AI Analysis states
+  final stt.SpeechToText _speechToText = stt.SpeechToText();
+  bool _isListening = false;
+  final TextEditingController _speechController = TextEditingController();
+  bool _isAnalyzingSpeech = false;
 
   // Profile photo & banner (base64 data URIs)
   String? _avatarBase64;
@@ -378,8 +385,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
+    _initSpeech();
     _loadUserData();
     _loadJobRoles();
+  }
+
+  void _initSpeech() async {
+    await _speechToText.initialize();
   }
 
   Future<void> _loadJobRoles() async {
@@ -440,6 +452,76 @@ class _ProfileScreenState extends State<ProfileScreen> {
         });
       }
     }
+  }
+
+  void _startListening() async {
+    if (!_isListening) {
+      bool available = await _speechToText.initialize();
+      if (available) {
+        setState(() => _isListening = true);
+        _speechToText.listen(
+          onResult: (result) {
+            setState(() {
+              _speechController.text = result.recognizedWords;
+            });
+          },
+        );
+      }
+    }
+  }
+
+  void _stopListening() async {
+    setState(() => _isListening = false);
+    await _speechToText.stop();
+  }
+
+  Future<void> _analyzeSpeechText() async {
+    final text = _speechController.text.trim();
+    if (text.isEmpty) return;
+    
+    setState(() => _isAnalyzingSpeech = true);
+    final extracted = await _apiService.analyzeProfileText(text);
+    
+    if (extracted != null && extracted.isNotEmpty) {
+      // Find new skills that aren't already in combined skills
+      final newSkills = extracted.where((s) => !_combinedSkills.contains(s)).toList();
+      
+      _mergeSkills(extracted, _combinedSkills);
+
+      final auth = FirebaseAuth.instance;
+      if (auth.currentUser != null) {
+        await _userService.updateUser(
+          uid: auth.currentUser!.uid,
+          skills: _combinedSkills,
+        );
+      }
+      
+      _analyzeSkillGap();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(newSkills.isNotEmpty 
+              ? 'Added ${newSkills.length} new skill(s): ${newSkills.join(", ")}'
+              : 'Analyzed successfully. Skills are already in your profile!'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not extract any standard skills from this description.'),
+            backgroundColor: AppColors.warning,
+          ),
+        );
+      }
+    }
+    setState(() {
+       _isAnalyzingSpeech = false;
+       _speechController.clear();
+    });
   }
 
   Future<void> _analyzeSkillGap() async {
@@ -949,6 +1031,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             padding: const EdgeInsets.all(20),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
+                _buildSpeechSection(),
+                const SizedBox(height: 16),
                 _buildResumeSection(),
                 const SizedBox(height: 16),
                 if (_resumeUploaded && _breakdown.isNotEmpty)
@@ -973,6 +1057,63 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 const SizedBox(height: 32),
               ]),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSpeechSection() {
+    return _SectionCard(
+      title: 'AI Analysis',
+      subtitle: 'Tell us a bit about yourself to extract your skills',
+      icon: Icons.record_voice_over_outlined,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextField(
+            controller: _speechController,
+            maxLines: 4,
+            minLines: 2,
+            style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+            decoration: InputDecoration(
+              hintText: 'e.g. "I enjoy building mobile apps in Flutter and managing databases in Firebase..."\n\nType or use the microphone to speak.',
+              hintStyle: const TextStyle(color: AppColors.textHint, fontSize: 13),
+              filled: true,
+              fillColor: AppColors.surfaceVariant,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.all(16),
+              suffixIcon: IconButton(
+                onPressed: _isListening ? _stopListening : _startListening,
+                icon: Icon(
+                  _isListening ? Icons.mic_off : Icons.mic,
+                  color: _isListening ? AppColors.error : AppColors.primary,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          ElevatedButton.icon(
+            onPressed: _isAnalyzingSpeech ? null : _analyzeSpeechText,
+            icon: _isAnalyzingSpeech
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white),
+                  )
+                : const Icon(Icons.auto_awesome, size: 18),
+            label: Text(_isAnalyzingSpeech ? 'Analyzing...' : 'Analyze & Save'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
             ),
           ),
         ],

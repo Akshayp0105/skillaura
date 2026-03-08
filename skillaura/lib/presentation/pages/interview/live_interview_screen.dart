@@ -136,7 +136,7 @@ class _LiveInterviewScreenState extends State<LiveInterviewScreen> {
     setState(() => _isListening = false);
     _speechToText.stop();
     
-    String finalWords = _lastWords.isNotEmpty ? _lastWords : "(User ended turn)";
+    String finalWords = _lastWords.isNotEmpty ? _lastWords : "(No speech detected)";
     _sendToAI(finalWords);
   }
 
