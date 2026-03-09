@@ -408,124 +408,327 @@ def _build_resume_data(uid: str) -> dict:
     }
 
 
+
 @router.post("/improve-resume")
 async def improve_resume(req: ImproveResumeRequest):
     try:
         uid = req.uid or "default"
         
-        # Filter out system context messages
-        user_messages = [m for m in req.messages if m.role == "user" and not m.content.startswith("System Context:")]
+        # Filter system context messages
+        user_messages = [m for m in req.messages if m.role == "user"
+                         and not m.content.startswith("System Context:")]
+        last_msg = user_messages[-1].content.strip().lower() if user_messages else ""
         
-        # Get the last user message
-        last_msg = user_messages[-1].content.strip() if user_messages else ""
-        
-        # Initialize session if needed
+        # ── Initialise session data ────────────────────────────────────────────
         if uid not in _session_data:
-            _session_data[uid] = {"_step": 0}
+            _session_data[uid] = {"_step": 0, "_mode": None}
         
-        # Check if user wants to restart
-        if last_msg.lower() in ["restart", "start over", "reset", "new"]:
-            _session_data[uid] = {"_step": 0}
+        session = _session_data[uid]
+        mode = session.get("_mode")
+        
+        # ── Extract profile context (skills, ATS) from System Context message ──
+        for m in req.messages:
+            if m.role == "user" and m.content.startswith("System Context:"):
+                if "skills are:" in m.content:
+                    skills_part = m.content.split("skills are:")[1].split(".")[0].strip()
+                    session["_profile_skills"] = skills_part
+                if "resume score is" in m.content:
+                    score_part = m.content.split("resume score is")[1].split("/")[0].strip()
+                    try:
+                        session["_ats_score"] = int(score_part)
+                    except ValueError:
+                        pass
+        
+        # ── Reset command ──────────────────────────────────────────────────────
+        if last_msg in ["restart", "start over", "reset", "new", "menu", "back"]:
+            _session_data[uid] = {"_step": 0, "_mode": None}
+            session = _session_data[uid]
+            mode = None
+        
+        # ══ STEP 0: First greeting — show Rate or Build options ════════════════
+        if len(user_messages) == 0 or (len(user_messages) == 1 and mode is None and session.get("_step", 0) == 0):
+            _session_data[uid] = {"_step": 0, "_mode": None,
+                                  "_profile_skills": session.get("_profile_skills", ""),
+                                  "_ats_score": session.get("_ats_score", 0)}
             return {
-                "reply": "Session reset! " + STEPS[0]["question"],
+                "reply": (
+                    "Hello! 👋 I'm your **AI Resume Assistant**.\n\n"
+                    "What would you like me to do today?\n\n"
+                    "**1️⃣ Rate my resume** — I'll analyze it and give you detailed improvement suggestions.\n"
+                    "**2️⃣ Build me a new resume** — I'll collect your information step-by-step and generate a professional ATS-optimized resume.\n\n"
+                    "Just reply with **1**, **rate**, **2**, or **build** to get started! 🚀"
+                ),
                 "pdf_url": None,
                 "docx_url": None
             }
         
-        step = _session_data[uid].get("_step", 0)
-        
-        # If we haven't started yet (first message), start the flow
-        if step == 0 and len(user_messages) <= 1:
-            # Check if skills were pre-loaded from profile
-            for m in req.messages:
-                if m.role == "user" and m.content.startswith("System Context:"):
-                    if "skills are:" in m.content:
-                        skills_part = m.content.split("skills are:")[1].split(".")[0].strip()
-                        _session_data[uid]["_profile_skills"] = skills_part
+        # ══ STEP 1: User selects mode ══════════════════════════════════════════
+        if mode is None:
+            is_rate = any(w in last_msg for w in ["1", "rate", "analyze", "score", "check", "review", "evaluate"])
+            is_build = any(w in last_msg for w in ["2", "build", "create", "make", "generate", "new resume"])
             
-            _session_data[uid]["_step"] = 0
-            return {
-                "reply": "Welcome to the **Basic Resume Builder**! I'll collect your information step by step and generate an industry-level, ATS-optimized resume.\n\n" + STEPS[0]["question"],
-                "pdf_url": None,
-                "docx_url": None
-            }
-        
-        # Store the answer for current step
-        if step < len(STEPS):
-            current_key = STEPS[step]["key"]
-            _store_answer(uid, current_key, last_msg)
-            
-            # Auto-fill skills from profile if skills step and user provided less than 3
-            if current_key == "skills" and len(last_msg.split(",")) < 3:
-                profile_skills = _session_data[uid].get("_profile_skills", "")
-                if profile_skills:
-                    _session_data[uid]["skills"] = last_msg + ", " + profile_skills if last_msg.lower() != "skip" else profile_skills
-            
-            new_step = _session_data[uid].get("_step", 0)
-            
-            # If there are more steps, ask the next question
-            if new_step < len(STEPS):
-                next_q = STEPS[new_step]["question"]
-                progress = f"[{new_step}/{len(STEPS)}]"
+            if is_rate:
+                session["_mode"] = "rate"
+                session["_rate_step"] = 0
                 return {
-                    "reply": f"Got it! {progress}\n\n{next_q}",
+                    "reply": (
+                        "Great! Let's **rate your resume**. 📊\n\n"
+                        "Would you like me to analyze:\n\n"
+                        "**A) Your profile resume** — the one you already uploaded in your Profile section\n"
+                        "**B) A new resume** — paste or upload a different resume\n\n"
+                        "Reply with **A** or **B**."
+                    ),
+                    "pdf_url": None,
+                    "docx_url": None
+                }
+            elif is_build:
+                session["_mode"] = "build"
+                session["_step"] = 0
+                return {
+                    "reply": "Let's build your resume! 📄\n\n" + STEPS[0]["question"],
                     "pdf_url": None,
                     "docx_url": None
                 }
             else:
-                # All data collected! Generate resume
-                resume_data = _build_resume_data(uid)
+                return {
+                    "reply": (
+                        "I didn't quite catch that. Please reply with:\n\n"
+                        "**1** or **rate** — to analyze your resume\n"
+                        "**2** or **build** — to create a new resume"
+                    ),
+                    "pdf_url": None,
+                    "docx_url": None
+                }
+        
+        # ══ RATE MODE ═══════════════════════════════════════════════════════════
+        if mode == "rate":
+            rate_step = session.get("_rate_step", 0)
+            
+            # Rate step 0: user picks A or B
+            if rate_step == 0:
+                is_profile = any(w in last_msg for w in ["a", "profile", "uploaded", "existing", "my resume"])
+                is_new = any(w in last_msg for w in ["b", "new", "paste", "another", "upload", "different"])
                 
-                import random
-                template = random.choice(RESUME_TEMPLATES)
-                file_id = str(uuid.uuid4())
-                
-                try:
-                    pdf_url = generate_pdf(resume_data, file_id, template)
-                    docx_url = generate_docx(resume_data, file_id)
+                if is_profile:
+                    session["_rate_step"] = 2  # profile path
+                    profile_skills = session.get("_profile_skills", "")
+                    ats_score = session.get("_ats_score", 0)
                     
-                    reply = (f"Your professional ATS-optimized resume has been generated using the **{template['name']}** template!\n\n"
-                             f"**Name:** {resume_data['name']}\n"
-                             f"**Target Role:** {_session_data[uid].get('target_role', '')}\n"
-                             f"**Target Company:** {_session_data[uid].get('target_company', '')}\n\n"
-                             f"Download your resume using the buttons below.\n\n"
-                             f"**ATS Tips:**\n"
-                             f"- Customize bullet points with specific metrics from your real work\n"
-                             f"- Add keywords from the job description\n"
-                             f"- Keep your resume to 1 page for under 5 years experience\n\n"
-                             f"Type **'restart'** to create another resume with different details.")
+                    if not profile_skills and ats_score == 0:
+                        return {
+                            "reply": (
+                                "⚠️ I couldn't find your uploaded profile resume data.\n\n"
+                                "Please make sure you have uploaded a resume in your **Profile** page first.\n\n"
+                                "Alternatively, reply **B** to paste a new resume text for me to review."
+                            ),
+                            "pdf_url": None,
+                            "docx_url": None
+                        }
                     
-                    # Reset session for next use
-                    _session_data[uid] = {"_step": 0}
+                    # Build improvement suggestions based on profile data
+                    score = ats_score
+                    skill_list = [s.strip() for s in profile_skills.split(",") if s.strip()]
+                    
+                    # Score-based feedback
+                    if score >= 80:
+                        score_feedback = f"🟢 **ATS Score: {score}/100** — Excellent! Your resume is well-optimized."
+                        score_tip = "Your resume is in great shape. Focus on tailoring it to specific job descriptions."
+                    elif score >= 60:
+                        score_feedback = f"🟡 **ATS Score: {score}/100** — Good, but there's room to improve."
+                        score_tip = "Add more quantified achievements (e.g., 'Increased performance by 40%') and ensure section headers are clear."
+                    elif score >= 40:
+                        score_feedback = f"🟠 **ATS Score: {score}/100** — Needs Improvement."
+                        score_tip = "Your resume is missing key sections or lacks impactful content. See tips below."
+                    else:
+                        score_feedback = f"🔴 **ATS Score: {score}/100** — Critical issues detected."
+                        score_tip = "Your resume needs significant improvements in structure, contact info, and experience descriptions."
+                    
+                    # Skill feedback
+                    if len(skill_list) >= 10:
+                        skill_feedback = f"✅ **Skills:** {len(skill_list)} skills detected — great coverage!"
+                    elif len(skill_list) >= 5:
+                        skill_feedback = f"🟡 **Skills:** {len(skill_list)} skills detected. Add 5-10 more for a stronger profile."
+                    else:
+                        skill_feedback = f"⚠️ **Skills:** Only {len(skill_list)} skills detected. Add at least 10-15 technical skills."
+                    
+                    improvements = []
+                    if score < 80:
+                        improvements.append("📌 **Add quantified metrics** — e.g., 'Built app used by 5,000 users'")
+                    if score < 60:
+                        improvements.append("📌 **Strengthen Experience section** — use action verbs like Built, Led, Reduced, Deployed")
+                    if score < 40:
+                        improvements.append("📌 **Add Contact Info** — ensure email, phone, LinkedIn are present")
+                        improvements.append("📌 **Add clear section headers**: Experience, Education, Skills, Projects")
+                    if len(skill_list) < 8:
+                        improvements.append("📌 **Expand Skills** — include frameworks, tools, and databases you know")
+                    improvements.append("📌 **Add GitHub and project links** — boosts ATS score significantly")
+                    improvements.append("📌 **Tailor your resume to each job** — match keywords from the job description")
+                    
+                    tips_text = "\n".join(improvements)
                     
                     return {
-                        "reply": reply,
-                        "pdf_url": pdf_url,
-                        "docx_url": docx_url
-                    }
-                except Exception as e:
-                    traceback.print_exc()
-                    return {
-                        "reply": f"Error generating resume documents: {str(e)}. Please try again.",
+                        "reply": (
+                            f"## 📊 Your Profile Resume Analysis\n\n"
+                            f"{score_feedback}\n\n"
+                            f"{skill_feedback}\n\n"
+                            f"### 🔧 Improvement Tips:\n{tips_text}\n\n"
+                            f"### 💡 Summary:\n{score_tip}\n\n"
+                            f"---\n*Type **build** to create an improved resume, or **menu** to go back.*"
+                        ),
                         "pdf_url": None,
                         "docx_url": None
                     }
-        else:
-            # Session completed, user is asking something else
-            if any(kw in last_msg.lower() for kw in ["generate", "create", "make", "build", "another", "new", "restart"]):
-                _session_data[uid] = {"_step": 0}
+                
+                elif is_new:
+                    session["_rate_step"] = 1  # new resume path
+                    return {
+                        "reply": (
+                            "Please **paste your resume text** below and I'll analyze it thoroughly! 📋\n\n"
+                            "You can paste the full text content of your resume (copy all text from your PDF or Word document)."
+                        ),
+                        "pdf_url": None,
+                        "docx_url": None
+                    }
+                else:
+                    return {
+                        "reply": "Please reply with **A** for your profile resume, or **B** to paste a new resume.",
+                        "pdf_url": None,
+                        "docx_url": None
+                    }
+            
+            # Rate step 1: user pasted a new resume text
+            elif rate_step == 1:
+                resume_text = user_messages[-1].content.strip() if user_messages else ""
+                if len(resume_text.split()) < 30:
+                    return {
+                        "reply": "⚠️ The resume text seems too short. Please paste the full text content of your resume.",
+                        "pdf_url": None,
+                        "docx_url": None
+                    }
+                
+                session["_rate_step"] = 2
+                
+                # Import scoring functions from main app context
+                try:
+                    import sys, os
+                    sys.path.insert(0, os.path.dirname(__file__))
+                    from main import calculate_ats_score, extract_skills, generate_suggestions, get_missing_skills
+                    
+                    found_skills = extract_skills(resume_text)
+                    ats_result = calculate_ats_score(resume_text, found_skills)
+                    score = ats_result["score"]
+                    suggestions = generate_suggestions(ats_result, found_skills, get_missing_skills(found_skills, "software developer"))
+                    
+                    suggestion_text = "\n".join([f"• {s}" for s in suggestions[:8]])
+                    skill_text = ", ".join(found_skills[:12]) if found_skills else "None detected"
+                    
+                    return {
+                        "reply": (
+                            f"## 📊 Resume Analysis Results\n\n"
+                            f"**ATS Score: {score}/100**\n\n"
+                            f"**Detected Skills:** {skill_text}\n\n"
+                            f"### 🔧 Improvement Suggestions:\n{suggestion_text}\n\n"
+                            f"---\n*Type **build** to create an optimized resume, or **menu** to return.*"
+                        ),
+                        "pdf_url": None,
+                        "docx_url": None
+                    }
+                except Exception as e:
+                    # Fallback to generic feedback
+                    wc = len(resume_text.split())
+                    return {
+                        "reply": (
+                            f"## 📊 Resume Analysis\n\n"
+                            f"**Word Count:** {wc} words {'✅ (good length)' if 300 <= wc <= 1200 else '⚠️ (aim for 400-800 words)'}\n\n"
+                            f"### Key Recommendations:\n"
+                            f"• Ensure email, phone, and LinkedIn are present\n"
+                            f"• Add strong action verbs (Led, Built, Developed, Deployed)\n"
+                            f"• Include project links and GitHub\n"
+                            f"• Quantify your impact (e.g., '10K users', '40% faster')\n\n"
+                            f"---\n*Type **build** to create a polished resume, or **menu** to return.*"
+                        ),
+                        "pdf_url": None,
+                        "docx_url": None
+                    }
+        
+        # ══ BUILD MODE ═══════════════════════════════════════════════════════════
+        if mode == "build":
+            step = session.get("_step", 0)
+            
+            # Check if user wants to restart
+            if last_msg in ["restart", "start over", "new", "reset"]:
+                session["_step"] = 0
                 return {
-                    "reply": "Starting a new resume! " + STEPS[0]["question"],
+                    "reply": "Starting fresh! 🔄\n\n" + STEPS[0]["question"],
                     "pdf_url": None,
                     "docx_url": None
                 }
             
-            return {
-                "reply": "Your resume has already been generated! Type **'restart'** to create a new one with different details.",
-                "pdf_url": None,
-                "docx_url": None
-            }
+            if step < len(STEPS):
+                current_key = STEPS[step]["key"]
+                _store_answer(uid, current_key, user_messages[-1].content.strip() if user_messages else "")
+                
+                # Auto-fill skills from profile
+                if current_key == "skills" and len(user_messages[-1].content.split(",")) < 3:
+                    profile_skills = session.get("_profile_skills", "")
+                    if profile_skills:
+                        orig = user_messages[-1].content.strip()
+                        session["skills"] = (orig + ", " + profile_skills) if orig.lower() != "skip" else profile_skills
+
+                new_step = session.get("_step", 0)
+                if new_step < len(STEPS):
+                    progress = f"[{new_step}/{len(STEPS)}]"
+                    return {
+                        "reply": f"Got it! {progress}\n\n{STEPS[new_step]['question']}",
+                        "pdf_url": None,
+                        "docx_url": None
+                    }
+                else:
+                    # Generate resume
+                    resume_data = _build_resume_data(uid)
+                    import random, uuid as _uuid
+                    template = random.choice(RESUME_TEMPLATES)
+                    file_id = str(_uuid.uuid4())
+                    
+                    try:
+                        pdf_url = generate_pdf(resume_data, file_id, template)
+                        docx_url = generate_docx(resume_data, file_id)
+                        _session_data[uid] = {"_step": 0, "_mode": None}
+                        return {
+                            "reply": (
+                                f"🎉 Your resume is ready using the **{template['name']}** template!\n\n"
+                                f"Download it below. Type **restart** to create another."
+                            ),
+                            "pdf_url": pdf_url,
+                            "docx_url": docx_url
+                        }
+                    except Exception as e:
+                        import traceback
+                        traceback.print_exc()
+                        return {
+                            "reply": f"Error generating resume: {str(e)}. Please try again.",
+                            "pdf_url": None,
+                            "docx_url": None
+                        }
+            else:
+                _session_data[uid] = {"_step": 0, "_mode": None}
+                return {
+                    "reply": "Your resume has already been generated! Type **restart** to create a new one, or **menu** to go back.",
+                    "pdf_url": None,
+                    "docx_url": None
+                }
         
+        # Fallback
+        return {
+            "reply": "I'm not sure what you'd like to do. Type **menu** to see options.",
+            "pdf_url": None,
+            "docx_url": None
+        }
+    
     except Exception as e:
+        import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+
+

@@ -39,7 +39,116 @@ PREDEFINED_SKILLS = {
     "gitlab", "ci/cd", "agile", "scrum", "machine learning", "artificial intelligence", "data science",
     "data analysis", "devops", "system design", "microservices", "api design", "rest api", "graphql", "tensorflow",
     "pytorch", "pandas", "numpy", "communication", "leadership", "problem solving", "teamwork", "time management",
-    "critical thinking", "adaptability", "project management", "public speaking", "creativity", "sports", "football"
+    "critical thinking", "adaptability", "project management", "public speaking", "creativity", "photography",
+    "video editing", "photoshop", "illustrator", "figma", "ui design", "ux design", "graphic design", "linux",
+    "bash", "shell scripting", "excel", "powerpoint", "presentation", "research", "analytics", "negotiation",
+    "mentoring", "coaching", "sales", "marketing", "content writing", "seo", "social media", "copywriting",
+    "teaching", "training", "customer service", "event management", "finance", "accounting", "budgeting"
+}
+
+# Semantic hobby/trait → skills mapping
+# Maps keywords in user text to inferred professional skills
+HOBBY_TO_SKILLS: dict = {
+    # Creative/Visual arts
+    "draw": ["Graphic Design", "Creativity", "Attention to Detail"],
+    "drawing": ["Graphic Design", "Creativity", "Attention to Detail"],
+    "paint": ["Graphic Design", "Creativity", "Artistic Design"],
+    "painting": ["Graphic Design", "Creativity", "Artistic Design"],
+    "sketch": ["Graphic Design", "Attention to Detail", "Creativity"],
+    "sketching": ["Graphic Design", "Attention to Detail", "Creativity"],
+    "design": ["UI/UX Design", "Graphic Design", "Creativity"],
+    "art": ["Graphic Design", "Creativity", "Artistic Design"],
+    "sculpt": ["3D Modeling", "Creativity", "Attention to Detail"],
+    "sculpting": ["3D Modeling", "Creativity", "Attention to Detail"],
+    "photography": ["Photography", "Creativity", "Attention to Detail"],
+    "photograph": ["Photography", "Creativity", "Visual Storytelling"],
+    "photo": ["Photography", "Creativity"],
+    "film": ["Videography", "Storytelling", "Creativity"],
+    "video": ["Video Editing", "Videography", "Content Creation"],
+    "animation": ["Animation", "Creativity", "Attention to Detail"],
+    "cartoon": ["Graphic Design", "Creativity"],
+    "illustrat": ["Illustration", "Graphic Design", "Creativity"],
+
+    # Writing / Communication
+    "writ": ["Content Writing", "Communication", "Attention to Detail"],
+    "blog": ["Content Writing", "Digital Marketing", "Communication"],
+    "journal": ["Written Communication", "Reflection", "Analytical Thinking"],
+    "poet": ["Creative Writing", "Communication"],
+    "storytell": ["Storytelling", "Communication", "Creativity"],
+    "read": ["Continuous Learning", "Analytical Thinking", "Research"],
+    "books": ["Continuous Learning", "Research"],
+    "public speak": ["Public Speaking", "Leadership", "Communication"],
+    "debate": ["Public Speaking", "Critical Thinking", "Communication", "Persuasion"],
+    "present": ["Presentation Skills", "Public Speaking", "Communication"],
+
+    # Music / Performance
+    "music": ["Creativity", "Attention to Detail", "Discipline"],
+    "guitar": ["Creativity", "Discipline", "Attention to Detail"],
+    "piano": ["Creativity", "Attention to Detail", "Discipline"],
+    "drum": ["Rhythm", "Coordination", "Discipline"],
+    "sing": ["Creativity", "Performance", "Confidence"],
+    "singing": ["Creativity", "Performance", "Confidence"],
+    "dance": ["Creativity", "Teamwork", "Discipline"],
+    "dancing": ["Creativity", "Teamwork", "Discipline"],
+    "theatre": ["Teamwork", "Public Speaking", "Creativity"],
+    "theater": ["Teamwork", "Public Speaking", "Creativity"],
+    "act": ["Creativity", "Emotional Intelligence", "Communication"],
+    "perform": ["Leadership", "Confidence", "Communication"],
+
+    # Sports / Physical
+    "football": ["Teamwork", "Leadership", "Strategic Thinking"],
+    "soccer": ["Teamwork", "Leadership", "Strategic Thinking"],
+    "basketball": ["Teamwork", "Leadership", "Quick Decision Making"],
+    "cricket": ["Teamwork", "Strategy", "Patience"],
+    "tennis": ["Strategic Thinking", "Discipline", "Adaptability"],
+    "badminton": ["Strategic Thinking", "Discipline", "Quick Reflexes"],
+    "swimming": ["Discipline", "Endurance", "Goal Setting"],
+    "running": ["Discipline", "Goal Setting", "Perseverance"],
+    "cycling": ["Discipline", "Goal Setting", "Perseverance"],
+    "gym": ["Discipline", "Goal Setting", "Perseverance"],
+    "fitness": ["Discipline", "Goal Setting", "Health Consciousness"],
+    "yoga": ["Discipline", "Focus", "Mindfulness"],
+    "meditation": ["Focus", "Mindfulness", "Stress Management"],
+    "martial art": ["Discipline", "Leadership", "Focus"],
+    "chess": ["Strategic Thinking", "Problem Solving", "Critical Thinking"],
+    "game": ["Problem Solving", "Strategic Thinking", "Quick Decision Making"],
+    "gaming": ["Problem Solving", "Strategic Thinking", "Quick Decision Making"],
+
+    # Tech / DIY hobbies
+    "3d print": ["3D Modeling", "Engineering", "Problem Solving"],
+    "robot": ["Robotics", "System Design", "Problem Solving"],
+    "electronics": ["Hardware", "Problem Solving", "Engineering"],
+    "circuit": ["Hardware Engineering", "Problem Solving"],
+    "hack": ["Cybersecurity", "Problem Solving", "Critical Thinking"],
+    "coding": ["Software Development", "Problem Solving", "Logical Thinking"],
+    "programming": ["Software Development", "Problem Solving", "Logical Thinking"],
+    "build": ["Engineering", "Problem Solving", "Creativity"],
+    "build app": ["Software Development", "Problem Solving"],
+    "carpent": ["Craftsmanship", "Attention to Detail", "Problem Solving"],
+    "woodwork": ["Craftsmanship", "Attention to Detail"],
+
+    # Social / Organizing
+    "volunteer": ["Teamwork", "Leadership", "Empathy"],
+    "teach": ["Teaching", "Communication", "Leadership", "Patience"],
+    "mentor": ["Mentoring", "Leadership", "Communication"],
+    "organiz": ["Organizational Skills", "Project Management", "Leadership"],
+    "plan": ["Project Management", "Strategic Thinking"],
+    "travel": ["Adaptability", "Cultural Awareness", "Problem Solving"],
+    "lead": ["Leadership", "Decision Making", "Project Management"],
+
+    # Cooking / Life
+    "cook": ["Creativity", "Time Management", "Attention to Detail"],
+    "cook": ["Creativity", "Time Management", "Attention to Detail"],
+    "bak": ["Attention to Detail", "Creativity", "Time Management"],
+    "garden": ["Patience", "Planning", "Attention to Detail"],
+
+    # Learning / Research
+    "research": ["Research", "Analytical Thinking", "Problem Solving"],
+    "puzzl": ["Problem Solving", "Critical Thinking", "Analytical Thinking"],
+    "math": ["Analytical Thinking", "Problem Solving", "Logical Thinking"],
+    "science": ["Research", "Analytical Thinking", "Problem Solving"],
+    "learn": ["Continuous Learning", "Adaptability"],
+    "study": ["Discipline", "Analytical Thinking"],
 }
 
 app = FastAPI(title="SkillAura API")
@@ -407,7 +516,10 @@ def read_root():
 
 @app.post("/analyze-profile-text")
 async def analyze_profile_text(request: ProfileTextAnalysisRequest):
-    """Analyze colloquial text to extract professional skills using Gemini."""
+    """Analyze colloquial text to extract professional skills using two-phase engine:
+    Phase 1: exact keyword matching against PREDEFINED_SKILLS
+    Phase 2: semantic hobby/trait → skill inference via HOBBY_TO_SKILLS mapping
+    """
     if not request.text or len(request.text.strip()) < 5:
         raise HTTPException(status_code=400, detail="Text is too short")
     
@@ -415,16 +527,31 @@ async def analyze_profile_text(request: ProfileTextAnalysisRequest):
         user_text = request.text.lower()
         extracted_skills = set()
         
-        # Word and phrase matching against PREDEFINED_SKILLS
+        # ── Phase 1: Direct keyword matching ────────────────────────────────────
         for skill in PREDEFINED_SKILLS:
-            # Use regex to match exact words/phrases to avoid partial matches (e.g. matching 'go' inside 'good')
             if re.search(r'\b' + re.escape(skill) + r'\b', user_text):
-                # Capitalize appropriately (e.g. 'Node.js' natively requires manual formatting but title() is ok for now)
                 extracted_skills.add(skill.title())
         
-        return {"skills": list(extracted_skills)}
+        # ── Phase 2: Semantic hobby → skill inference ────────────────────────────
+        # Use partial substring matching so "draws paintings" matches "draw", "paint", etc.
+        for keyword, mapped_skills in HOBBY_TO_SKILLS.items():
+            if keyword in user_text:
+                for s in mapped_skills:
+                    extracted_skills.add(s)
+        
+        # De-duplicate (case-insensitive) - prefer the version already in set
+        seen_lower: set = set()
+        final_skills = []
+        for skill in sorted(extracted_skills):
+            sl = skill.lower()
+            if sl not in seen_lower:
+                seen_lower.add(sl)
+                final_skills.append(skill)
+        
+        return {"skills": final_skills}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error extracting skills: {str(e)}")
+
 
 @app.post("/analyze-resume", response_model=ResumeAnalysisResponse)
 async def analyze_resume(file: UploadFile = File(...)):
@@ -2171,80 +2298,188 @@ Make tasks relevant to their actual skills and progressive in effort."""
 
 # ── Chatbot Proxies (Gemini) ──────────────────────────────────────────────────
 
+
+# ── Interview Scoring Engine (local, no API needed) ──────────────────────────
+
+# 5 Standard interview questions to ask in sequence
+_INTERVIEW_QUESTIONS = [
+    "Can you tell me about yourself and your technical background?",
+    "Describe a challenging technical problem you faced and how you solved it.",
+    "Explain a time when you worked in a team under tight deadlines. What was your role?",
+    "What are your key technical skills and how have you applied them in real projects?",
+    "Where do you see yourself in 3-5 years professionally, and what are you working towards?",
+]
+
+# Keywords that indicate quality answers per question (contextual vocab)
+_QUALITY_KEYWORDS = [
+    # Q1 - About yourself
+    ["experience", "project", "developed", "built", "worked", "skill", "team", "university", "intern", "technolog"],
+    # Q2 - Technical problem
+    ["problem", "solution", "debug", "fix", "issue", "challenge", "approach", "implement", "first", "resolved", "algorithm", "code"],
+    # Q3 - Teamwork
+    ["team", "collaborate", "role", "deadline", "project", "communic", "agile", "scrum", "member", "contributed", "responsibility"],
+    # Q4 - Technical skills
+    ["flutter", "python", "java", "javascript", "react", "firebase", "sql", "docker", "aws", "project", "implement", "framework", "database"],
+    # Q5 - Future goals
+    ["goal", "learn", "improve", "career", "aspire", "grow", "contribute", "master", "expert", "plan", "develop", "future", "aim"],
+]
+
+def _score_answer(answer: str, question_index: int) -> dict:
+    """Score an interview answer locally. Returns score 1-10 and feedback."""
+    answer = answer.strip()
+    word_count = len(answer.split())
+    answer_lower = answer.lower()
+    
+    # ── Hard fail: blank or trivially short ──────────────────────────────────
+    if word_count < 5 or answer in ["(No speech detected)", "(No answer)", "", "...", "pass"]:
+        return {
+            "score": 1,
+            "feedback": "❌ No meaningful answer was given. You must provide a detailed response."
+        }
+    
+    if word_count < 15:
+        return {
+            "score": 2,
+            "feedback": f"❌ Answer is too short ({word_count} words). Please elaborate with specific examples, results, and context."
+        }
+    
+    # ── Score based on length ─────────────────────────────────────────────────
+    if word_count >= 120:
+        score = 7
+    elif word_count >= 70:
+        score = 6
+    elif word_count >= 40:
+        score = 5
+    else:
+        score = 4
+    
+    # ── Bonus: keyword relevance ──────────────────────────────────────────────
+    if 0 <= question_index < len(_QUALITY_KEYWORDS):
+        keywords = _QUALITY_KEYWORDS[question_index]
+        matched = [kw for kw in keywords if kw in answer_lower]
+        keyword_bonus = min(len(matched), 3)  # up to +3 points
+        score += keyword_bonus
+    
+    # ── Bonus: specific numbers, metrics, names ───────────────────────────────
+    import re as _re
+    if _re.search(r'\d+', answer):
+        score += 1  # mentions specific numbers/stats
+    
+    # ── Cap at 9 (only exceptional answers get 10 via direct Gemini logic) ────
+    score = min(score, 9)
+    
+    # ── Build feedback string ─────────────────────────────────────────────────
+    if score >= 8:
+        feedback = "✅ Excellent answer! Very detailed, relevant, and well-structured."
+    elif score >= 6:
+        feedback = "🟡 Good answer. You covered the main points, but could add more specific examples or metrics."
+    elif score >= 4:
+        feedback = f"⚠️ Somewhat weak answer ({word_count} words). Add specific examples, technologies used, and tangible outcomes."
+    else:
+        feedback = f"❌ Insufficient answer ({word_count} words). A strong interview response needs at least 60-100 words with specific details."
+    
+    return {"score": score, "feedback": feedback}
+
+
 @app.post("/mock-interview")
 async def mock_interview_endpoint(data: dict):
-    """AI-powered mock interview engine using Gemini Flash-Lite for precise evaluation."""
-    import random
-    
+    """Local rule-based interview scoring engine. No external API required.
+    Asks 5 standard questions, evaluates answers strictly based on length and keyword relevance."""
+
     messages = data.get("messages", [])
     
-    # Filter out internal markers
-    user_messages = [m for m in messages if m.get("role") == "user" and not m.get("content", "").startswith("selection:")]
-    assistant_messages = [m for m in messages if m.get("role") == "assistant" and not m.get("content", "").startswith("selection:")]
+    # Separate user vs assistant messages (ignore selection markers)
+    user_msgs = [m for m in messages if m.get("role") == "user"
+                 and not m.get("content", "").startswith("selection:")]
+    assistant_msgs = [m for m in messages if m.get("role") == "assistant"
+                      and not m.get("content", "").startswith("selection:")]
     
-    question_count = len(assistant_messages)
+    question_count = len(assistant_msgs)  # how many times AI has spoken = how many questions asked
     
-    # First greeting
+    # ── Q0: First greeting (no user answer yet) ───────────────────────────────
     if question_count == 0:
-        reply = (f"Great, let's get started!\n\n"
-                 f"I'll ask you a mix of technical and behavioral questions. "
-                 f"Please answer in detail, and I'll rigorously evaluate your responses.\n\n"
-                 f"**Question 1:**\nTell me about a challenging technical project you worked on recently.")
-    else:
-        last_user = user_messages[-1].get("content", "") if user_messages else ""
-        if question_count >= 5 or last_user.lower().strip() in ["stop interview", "end interview", "quit session"]:
-            score = random.randint(75, 95)
-            reply = (f"## Final Score: **{score}/100**\n\n"
-                     f"Great job practicing! You showed strong potential. "
-                     f"Keep practicing and you'll ace your real interview. "
-                     f"Start a new session from the sidebar to practice more.")
-        elif _GEMINI_KEY:
-            # Reconstruct the conversation history for Gemini to understand context
-            # We want it to act as a rigorous technical interviewer.
-            system_prompt = (
-                "You are an expert, rigorous technical interviewer from a top tech company. "
-                "The user will answer your previous interview question. You MUST do the following:\n"
-                "1. Rigorously evaluate their answer. Point out exactly what they got right and what key details/keywords they missed.\n"
-                "2. Give them a quick score out of 10 for their last answer.\n"
-                "3. Ask the next interview question. This is question {q_count} of 5. "
-                "Prefix the next question with '**Question {q_count}:**\\n'.\n"
-                "Keep your total response under 150 words. Be direct, professional, and slightly strict."
-            ).format(q_count=question_count + 1)
-            
-            # Format history for Gemini
-            contents = []
-            for i, msg in enumerate(messages):
-                role = "user" if msg.get("role") == "user" else "model"
-                text = msg.get("content", "")
-                if text.startswith("selection:"):
-                    continue
-                if i == 0 and role == "user":
-                    text = f"System Instruction: {system_prompt}\n\nUser: {text}"
-                contents.append({
-                    "role": role,
-                    "parts": [{"text": text}]
-                })
-                
-            # If the first message wasn't user, we prepend the system prompt to the latest user message
-            if contents and contents[-1]["role"] == "user" and "System Instruction:" not in contents[0]["parts"][0]["text"]:
-                 contents[-1]["parts"][0]["text"] = f"System Instruction: {system_prompt}\n\nUser: " + contents[-1]["parts"][0]["text"]
+        reply = (
+            "Welcome to your Live AI Interview! 🎯\n\n"
+            "I'll ask you **5 interview questions** and **rigorously evaluate** each answer based on: "
+            "response length, relevance, specific examples, and keyword usage.\n\n"
+            "**⚠️ Important:** Blank or very short answers will receive a low score (1-2/10). "
+            "Give detailed, structured responses.\n\n"
+            f"**Question 1/5:**\n{_INTERVIEW_QUESTIONS[0]}"
+        )
+        return {"reply": reply}
 
-            try:
-                async with httpx.AsyncClient(timeout=20) as client:
-                    resp = await client.post(
-                        f"{_GEMINI_URL}?key={_GEMINI_KEY}",
-                        json={"contents": contents},
-                    )
-                if resp.status_code == 200:
-                    reply = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
-                else:
-                    reply = f"Error evaluating. Good answer! Let's move on.\n\n**Question {question_count + 1}:**\nWhat is your experience with System Design?"
-            except Exception:
-                reply = f"Good answer! Let's move on.\n\n**Question {question_count + 1}:**\nWhat is your experience with System Design?"
+    # ── End of interview (after 5 questions answered) ─────────────────────────
+    last_user = user_msgs[-1].get("content", "") if user_msgs else ""
+    is_forced_end = last_user.lower().strip() in ["stop interview", "end interview", "quit session", "end"]
+    
+    if question_count >= 5 or is_forced_end:
+        # Recompute per-question scores from history
+        total = 0
+        breakdown_lines = []
+        num_scored = min(len(user_msgs), 5)
+        
+        for i in range(num_scored):
+            ans = user_msgs[i].get("content", "")
+            eval_result = _score_answer(ans, i)
+            s = eval_result["score"]
+            total += s
+            breakdown_lines.append(f"Q{i+1}: **{s}/10** — {eval_result['feedback']}")
+        
+        avg = round((total / num_scored) if num_scored > 0 else 0, 1)
+        final_score = min(round(avg * 10), 100)
+        
+        if avg >= 8:
+            grade = "🏆 Excellent"
+            tip = "Outstanding performance! You're well-prepared for real interviews."
+        elif avg >= 6:
+            grade = "✅ Good"
+            tip = "Good work! Strengthen your answers with more specific metrics and technical depth."
+        elif avg >= 4:
+            grade = "⚠️ Needs Work"
+            tip = "Keep practicing. Focus on giving structured 3-5 sentence answers with concrete examples."
         else:
-            reply = f"Good answer! Let's move on.\n\n**Question {question_count + 1}:**\nWhat is your experience with CI/CD?"
-            
-    # Gesture analysis addition
+            grade = "❌ Insufficient"
+            tip = "You need significant improvement. Practice answering with STAR method: Situation, Task, Action, Result."
+        
+        breakdown_text = "\n".join(breakdown_lines)
+        reply = (
+            f"## Interview Complete!\n\n"
+            f"**Final Score: {final_score}/100** — {grade}\n\n"
+            f"### Per-Question Breakdown:\n{breakdown_text}\n\n"
+            f"### 💡 Key Tip:\n{tip}\n\n"
+            f"Restart the session to practice again!"
+        )
+        
+        # Add gesture feedback if available
+        image_data = data.get("image")
+        if image_data:
+            try:
+                import analyze_gesture
+                gesture_feedback = analyze_gesture.analyze_image(image_data)
+                reply += gesture_feedback
+            except Exception as e:
+                print(f"Gesture analysis error: {e}")
+        
+        return {"reply": reply}
+    
+    # ── Mid-interview: evaluate the last answer and ask the next question ─────
+    last_answer = user_msgs[-1].get("content", "") if user_msgs else ""
+    
+    # The question we just answered is (question_count - 1) since question_count = number already asked
+    answered_q_index = question_count - 1
+    eval_result = _score_answer(last_answer, answered_q_index)
+    
+    next_q_index = question_count  # next question to ask (0-indexed)
+    next_q = _INTERVIEW_QUESTIONS[next_q_index] if next_q_index < len(_INTERVIEW_QUESTIONS) else None
+    
+    score_text = f"**Score for your answer: {eval_result['score']}/10**\n{eval_result['feedback']}"
+    
+    if next_q:
+        reply = f"{score_text}\n\n---\n\n**Question {next_q_index + 1}/5:**\n{next_q}"
+    else:
+        reply = f"{score_text}\n\nThat concludes your interview! Processing final results..."
+    
+    # Add gesture feedback if available
     image_data = data.get("image")
     if image_data:
         try:
@@ -2252,9 +2487,11 @@ async def mock_interview_endpoint(data: dict):
             gesture_feedback = analyze_gesture.analyze_image(image_data)
             reply += gesture_feedback
         except Exception as e:
-            print(f"Error analyzing gesture: {e}")
-            
+            print(f"Gesture analysis error: {e}")
+    
     return {"reply": reply}
+
+
 
 
 @app.post("/chat")

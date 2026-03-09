@@ -51,14 +51,8 @@ class _ImproveResumeChatScreenState extends State<ImproveResumeChatScreen> {
       _history = [];
       _pdfUrl = null;
       _docxUrl = null;
-      _messages = [
-        ChatMessage(
-          id: _uuid.v4(),
-          content: "Hi! I'm your Basic Resume Builder 📄✨\n\nI'll collect your details step by step and use AI to generate an **industry-level, ATS-optimized resume** tailored for your target role and company.\n\nType anything to get started!",
-          isUser: false,
-          timestamp: DateTime.now(),
-        ),
-      ];
+      // Use a loading placeholder; real greeting comes from backend
+      _messages = [];
     });
 
     final uid = FirebaseAuth.instance.currentUser?.uid;
@@ -67,17 +61,82 @@ class _ImproveResumeChatScreenState extends State<ImproveResumeChatScreen> {
         final profile = await UserService().getUser(uid);
         if (profile != null) {
           final skills = profile.skills.join(', ');
-          final resumeContext = "System Context: The user's current known skills are: $skills. Their current ATS resume score is ${profile.resumeScore}/100.\n\n(Do not explicitly mention that you read this system context yet, just wait for them to give you their target role and company. Use this overview of their skills to evaluate their fit.)";
+          final resumeScore = profile.resumeScore;
+          // Pass profile context so backend can use it for "Rate Profile Resume" path
+          final resumeContext =
+              'System Context: The user\'s current known skills are: $skills. '
+              'Their current ATS resume score is $resumeScore/100. '
+              'Use this to provide improvement tips if they choose to rate their profile resume.';
           _history.add({'role': 'user', 'content': resumeContext});
-          _history.add({'role': 'assistant', 'content': 'Understood. I have their general skills profile. I am waiting for their target role and company.'});
+          _history.add({'role': 'assistant', 'content': 'Understood. Profile context received.'});
         }
       } catch (e) {
-        debugPrint("Could not fetch user profile for resume context: $e");
+        debugPrint('Could not fetch user profile for resume context: $e');
+      }
+    }
+
+    // Trigger the backend to send the greeting (Rate vs Build options)
+    setState(() {
+      _isTyping = true;
+    });
+    await _callBackendForReply(isGreeting: true);
+    setState(() {
+      _isTyping = false;
+    });
+  }
+
+
+  /// Calls the backend and adds response as a bot message.
+  /// Used for the initial greeting (isGreeting: true) without a user message.
+  Future<void> _callBackendForReply({bool isGreeting = false}) async {
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      final response = await http
+          .post(
+            Uri.parse('$_kBackendUrl/improve-resume'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'uid': uid ?? '',
+              'messages': _history,
+            }),
+          )
+          .timeout(const Duration(seconds: 30));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final reply = data['reply'].toString().trim();
+        _history.add({'role': 'assistant', 'content': reply});
+
+        if (mounted) {
+          setState(() {
+            _messages.add(ChatMessage(
+              id: _uuid.v4(),
+              content: reply,
+              isUser: false,
+              timestamp: DateTime.now(),
+            ));
+          });
+          _scrollToBottom();
+        }
+      }
+    } catch (e) {
+      // On greeting fetch failure, show a simple fallback welcome
+      if (mounted && isGreeting) {
+        setState(() {
+          _messages.add(ChatMessage(
+            id: _uuid.v4(),
+            content:
+                "Hello! 👋 I'm your **AI Resume Assistant**.\n\nReply **1** to rate your resume, or **2** to build a new one.",
+            isUser: false,
+            timestamp: DateTime.now(),
+          ));
+        });
       }
     }
   }
 
   Future<void> _sendMessage() async {
+
     final text = _controller.text.trim();
     if (text.isEmpty) return;
 
