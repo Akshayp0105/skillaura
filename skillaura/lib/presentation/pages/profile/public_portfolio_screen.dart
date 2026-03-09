@@ -1,68 +1,113 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_theme.dart';
 
 class PublicPortfolioScreen extends StatefulWidget {
   final String uid;
-
   const PublicPortfolioScreen({super.key, required this.uid});
 
   @override
   State<PublicPortfolioScreen> createState() => _PublicPortfolioScreenState();
 }
 
-class _PublicPortfolioScreenState extends State<PublicPortfolioScreen> {
+class _PublicPortfolioScreenState extends State<PublicPortfolioScreen>
+    with TickerProviderStateMixin {
   bool _isLoading = true;
   String? _error;
-  
+
   String? _fullName;
   String? _university;
+  String? _bio;
   String? _avatarBase64;
   String? _bannerBase64;
-  
   String? _githubUsername;
+  String? _email;
   List<String> _skills = [];
   int _atsScore = 0;
+
+  late AnimationController _fadeCtrl;
+  late Animation<double> _fadeAnim;
 
   @override
   void initState() {
     super.initState();
+    _fadeCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 700));
+    _fadeAnim = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut);
     _fetchUserData();
+  }
+
+  @override
+  void dispose() {
+    _fadeCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchUserData() async {
     try {
-      final doc = await FirebaseFirestore.instance.collection('users').doc(widget.uid).get();
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.uid)
+          .get();
       if (!doc.exists) {
-        setState(() {
-          _error = 'User not found';
-          _isLoading = false;
-        });
+        setState(() { _error = 'User not found'; _isLoading = false; });
         return;
       }
-      
       final data = doc.data()!;
       setState(() {
-        _fullName = data['fullName'] as String?;
-        _university = data['university'] as String?;
-        _avatarBase64 = data['avatarBase64'] as String?;
-        _bannerBase64 = data['bannerBase64'] as String?;
-        _githubUsername = data['githubUsername'] as String?;
-        
-        if (data['skills'] != null) {
-           _skills = List<String>.from(data['skills']);
-        }
-        _atsScore = data['resumeScore'] as int? ?? 0;
-        
-        _isLoading = false;
+        _fullName        = data['fullName'] as String?;
+        _university      = data['university'] as String?;
+        _bio             = data['bio'] as String?;
+        _email           = data['email'] as String?;
+        _avatarBase64    = data['avatarBase64'] as String?;
+        _bannerBase64    = data['bannerBase64'] as String?;
+        _githubUsername  = data['githubUsername'] as String?;
+        _skills          = data['skills'] != null ? List<String>.from(data['skills']) : [];
+        _atsScore        = (data['resumeScore'] as int?) ?? 0;
+        _isLoading       = false;
       });
+      _fadeCtrl.forward();
     } catch (e) {
-      setState(() {
-        _error = 'Failed to load portfolio';
-        _isLoading = false;
-      });
+      setState(() { _error = 'Failed to load portfolio'; _isLoading = false; });
     }
+  }
+
+  /// Safely decode a base64 or data-URI string into bytes
+  Uint8List? _decodeImage(String? raw) {
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      if (raw.startsWith('data:')) {
+        return UriData.parse(raw).contentAsBytes();
+      }
+      return base64Decode(raw);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String get _shareableLink => 'http://localhost:8000/portfolio/${widget.uid}';
+  // For production: 'https://skillaura.app/portfolio/${widget.uid}'
+
+  void _copyLink() {
+    Clipboard.setData(ClipboardData(text: _shareableLink));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.link_rounded, color: Colors.white, size: 18),
+            const SizedBox(width: 8),
+            const Text('Portfolio link copied!', style: TextStyle(color: Colors.white)),
+          ],
+        ),
+        backgroundColor: AppColors.primary,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   @override
@@ -91,144 +136,250 @@ class _PublicPortfolioScreenState extends State<PublicPortfolioScreen> {
       );
     }
 
+    final avatarBytes = _decodeImage(_avatarBase64);
+    final bannerBytes = _decodeImage(_bannerBase64);
+
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: CustomScrollView(
-        slivers: [
-          // Banner & Profile Info
-          SliverAppBar(
-            expandedHeight: 240,
-            pinned: true,
-            backgroundColor: AppColors.background,
-            flexibleSpace: FlexibleSpaceBar(
-              background: Stack(
-                fit: StackFit.expand,
-                children: [
-                   // Banner Image or Default Gradient
-                  if (_bannerBase64 != null && _bannerBase64!.isNotEmpty)
-                    Image.memory(
-                       // base64 decode logic, safe handling data uri
-                       UriData.parse(_bannerBase64!).contentAsBytes(),
-                       fit: BoxFit.cover,
-                    )
-                  else
-                    Container(decoration: const BoxDecoration(gradient: AppColors.purpleGradient)),
-                  
-                  // Gradient overlay to make text readable
-                  Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [Colors.transparent, Colors.black.withValues(alpha: 0.8)],
+      body: FadeTransition(
+        opacity: _fadeAnim,
+        child: CustomScrollView(
+          slivers: [
+            // ── Hero Banner ──────────────────────────────────────────────────
+            SliverAppBar(
+              expandedHeight: 260,
+              pinned: true,
+              stretch: true,
+              backgroundColor: AppColors.background,
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.share_rounded, color: Colors.white),
+                  tooltip: 'Copy share link',
+                  onPressed: _copyLink,
+                ),
+              ],
+              flexibleSpace: FlexibleSpaceBar(
+                stretchModes: const [StretchMode.zoomBackground, StretchMode.fadeTitle],
+                background: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // Banner image or gradient
+                    if (bannerBytes != null)
+                      Image.memory(bannerBytes, fit: BoxFit.cover)
+                    else
+                      Container(
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [Color(0xFF6C63FF), Color(0xFF3A1CC4), Color(0xFFFF6584)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                        ),
+                      ),
+                    // Bottom gradient for text readability
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [Colors.transparent, Colors.black.withValues(alpha: 0.85)],
+                          stops: const [0.4, 1.0],
+                        ),
                       ),
                     ),
-                  ),
-                  
-                  // Profile Info
-                  Positioned(
-                    bottom: 20,
-                    left: 20,
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        CircleAvatar(
-                          radius: 40,
-                          backgroundColor: AppColors.surfaceVariant,
-                          backgroundImage: _avatarBase64 != null && _avatarBase64!.isNotEmpty
-                              ? MemoryImage(UriData.parse(_avatarBase64!).contentAsBytes())
-                              : null,
-                          child: (_avatarBase64 == null || _avatarBase64!.isEmpty)
-                              ? Text(
-                                  (_fullName?.isNotEmpty == true) ? _fullName!.substring(0, 1).toUpperCase() : '?',
-                                  style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w800, color: Colors.white),
-                                )
-                              : null,
-                        ),
-                        const SizedBox(width: 16),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              _fullName ?? 'Unknown User',
-                              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: Colors.white),
+                    // Profile info overlay
+                    Positioned(
+                      bottom: 20,
+                      left: 20,
+                      right: 70,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          // Avatar with border glow
+                          Container(
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: AppColors.primary, width: 3),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.primary.withValues(alpha: 0.5),
+                                  blurRadius: 12,
+                                  spreadRadius: 2,
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _university ?? 'Developer',
-                              style: TextStyle(fontSize: 14, color: Colors.white.withValues(alpha: 0.8)),
+                            child: CircleAvatar(
+                              radius: 38,
+                              backgroundColor: AppColors.surfaceVariant,
+                              backgroundImage:
+                                  avatarBytes != null ? MemoryImage(avatarBytes) : null,
+                              child: avatarBytes == null
+                                  ? Text(
+                                      (_fullName?.isNotEmpty == true)
+                                          ? _fullName![0].toUpperCase()
+                                          : '?',
+                                      style: const TextStyle(
+                                          fontSize: 30,
+                                          fontWeight: FontWeight.w800,
+                                          color: Colors.white),
+                                    )
+                                  : null,
                             ),
-                          ],
-                        ),
-                      ],
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  _fullName ?? 'Unknown User',
+                                  style: const TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white,
+                                      letterSpacing: 0.3),
+                                ),
+                                if (_university != null) ...[
+                                  const SizedBox(height: 3),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.school_outlined,
+                                          color: Colors.white70, size: 13),
+                                      const SizedBox(width: 4),
+                                      Flexible(
+                                        child: Text(
+                                          _university!,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                              fontSize: 13,
+                                              color: Colors.white70),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-          
-          // Content
-          SliverPadding(
-            padding: const EdgeInsets.all(20),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                if (_githubUsername != null) _buildGithubCard(),
-                const SizedBox(height: 20),
-                if (_atsScore > 0) _buildResumeCard(),
-                const SizedBox(height: 20),
-                _buildSkillsCard(),
-                const SizedBox(height: 60),
-                _buildFooter(),
-              ]),
+
+            // ── Content ──────────────────────────────────────────────────────
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate([
+
+                  // ── Shareable Link Card ─────────────────────────────────
+                  _ShareLinkCard(link: _shareableLink, onCopy: _copyLink),
+                  const SizedBox(height: 16),
+
+                  // ── Bio card ───────────────────────────────────────────
+                  if (_bio != null && _bio!.isNotEmpty) ...[
+                    _SectionCard(
+                      icon: Icons.person_outline_rounded,
+                      title: 'About',
+                      child: Text(
+                        _bio!,
+                        style: const TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 14,
+                            height: 1.6),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // ── ATS Score ──────────────────────────────────────────
+                  if (_atsScore > 0) ...[
+                    _buildResumeCard(),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // ── Skills ─────────────────────────────────────────────
+                  if (_skills.isNotEmpty) ...[
+                    _buildSkillsCard(),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // ── GitHub ─────────────────────────────────────────────
+                  if (_githubUsername != null && _githubUsername!.isNotEmpty) ...[
+                    _buildGithubCard(),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // ── Contact ────────────────────────────────────────────
+                  if (_email != null && _email!.isNotEmpty) ...[
+                    _SectionCard(
+                      icon: Icons.email_outlined,
+                      title: 'Contact',
+                      child: GestureDetector(
+                        onTap: () => launchUrl(Uri.parse('mailto:$_email')),
+                        child: Text(
+                          _email!,
+                          style: const TextStyle(
+                              color: AppColors.primary,
+                              fontSize: 14,
+                              decoration: TextDecoration.underline),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+
+                  // ── Footer ─────────────────────────────────────────────
+                  _buildFooter(),
+                ]),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
+  // ── GitHub Card ─────────────────────────────────────────────────────────────
   Widget _buildGithubCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+    return _SectionCard(
+      icon: Icons.code_rounded,
+      title: 'GitHub',
+      trailing: IconButton(
+        icon: const Icon(Icons.open_in_new_rounded, color: AppColors.textSecondary, size: 18),
+        onPressed: () => launchUrl(Uri.parse('https://github.com/$_githubUsername')),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Icon(Icons.code, color: AppColors.primary, size: 24),
-              const SizedBox(width: 12),
-              const Expanded(
-                 child: Text('GitHub Profile', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-              ),
-              IconButton(
-                icon: const Icon(Icons.open_in_new, color: AppColors.textSecondary, size: 20),
-                onPressed: () {
-                  launchUrl(Uri.parse('https://github.com/$_githubUsername'));
-                },
-              ),
-            ],
+          GestureDetector(
+            onTap: () => launchUrl(Uri.parse('https://github.com/$_githubUsername')),
+            child: Text(
+              '@$_githubUsername',
+              style: const TextStyle(
+                  color: AppColors.primary,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600),
+            ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            '@$_githubUsername',
-            style: const TextStyle(color: AppColors.primary, fontSize: 16, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 16),
-          // A nice github stats image from an external service
+          const SizedBox(height: 14),
           ClipRRect(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(10),
             child: Image.network(
-              'https://github-readme-stats.vercel.app/api?username=$_githubUsername&show_icons=true&theme=dracula&hide_border=true&bg_color=1c192b',
+              'https://github-readme-stats.vercel.app/api?username=$_githubUsername'
+              '&show_icons=true&theme=dark&hide_border=true&bg_color=1c192b'
+              '&icon_color=6C63FF&title_color=ffffff&text_color=aaaaaa',
               width: double.infinity,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => const SizedBox(),
+              fit: BoxFit.fitWidth,
+              errorBuilder: (_, __, ___) => const Padding(
+                padding: EdgeInsets.only(top: 8),
+                child: Text('GitHub stats unavailable',
+                    style: TextStyle(color: AppColors.textHint, fontSize: 12)),
+              ),
             ),
           ),
         ],
@@ -236,90 +387,81 @@ class _PublicPortfolioScreenState extends State<PublicPortfolioScreen> {
     );
   }
 
+  // ── ATS Score Card ──────────────────────────────────────────────────────────
   Widget _buildResumeCard() {
-    Color scoreColor = _atsScore >= 80 ? AppColors.success : (_atsScore >= 60 ? AppColors.warning : AppColors.error);
-    
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-      ),
+    final Color scoreColor =
+        _atsScore >= 80 ? AppColors.success : (_atsScore >= 60 ? AppColors.warning : AppColors.error);
+    final String label =
+        _atsScore >= 80 ? 'Excellent' : _atsScore >= 60 ? 'Good' : 'Needs Work';
+
+    return _SectionCard(
+      icon: Icons.description_outlined,
+      title: 'Resume ATS Score',
       child: Row(
         children: [
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
-                  children: [
-                    Icon(Icons.description_outlined, color: AppColors.primary, size: 24),
-                    SizedBox(width: 12),
-                    Text('Resume ATS Score', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                  ],
+                Text(
+                  label,
+                  style: TextStyle(
+                      color: scoreColor,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 8),
-                Text('Competitively ranked profile based on industry standards.', style: TextStyle(color: AppColors.textHint, fontSize: 14)),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: _atsScore / 100,
+                    backgroundColor: AppColors.surfaceVariant,
+                    color: scoreColor,
+                    minHeight: 6,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Competitively ranked vs industry standards.',
+                  style: const TextStyle(color: AppColors.textHint, fontSize: 12),
+                ),
               ],
             ),
           ),
-           Container(
-             width: 70,
-             height: 70,
-             decoration: BoxDecoration(
-               shape: BoxShape.circle,
-               border: Border.all(color: scoreColor, width: 4),
-             ),
-             alignment: Alignment.center,
-             child: Text(
-               '$_atsScore',
-               style: TextStyle(color: scoreColor, fontSize: 24, fontWeight: FontWeight.bold),
-             ),
-           ),
+          const SizedBox(width: 16),
+          Container(
+            width: 66,
+            height: 66,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: scoreColor, width: 3),
+              color: scoreColor.withValues(alpha: 0.1),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              '$_atsScore',
+              style: TextStyle(
+                  color: scoreColor,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800),
+            ),
+          ),
         ],
       ),
     );
   }
 
+  // ── Skills Card ─────────────────────────────────────────────────────────────
   Widget _buildSkillsCard() {
-    if (_skills.isEmpty) return const SizedBox();
-    
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(Icons.psychology_outlined, color: AppColors.primary, size: 24),
-              SizedBox(width: 12),
-              Text('Top Skills', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: _skills.map((skill) => Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
-              ),
-              child: Text(
-                skill,
-                style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
-              ),
-            )).toList(),
-          ),
-        ],
+    return _SectionCard(
+      icon: Icons.psychology_outlined,
+      title: 'Top Skills',
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: _skills
+            .map((s) => _SkillChip(label: s))
+            .toList(),
       ),
     );
   }
@@ -327,13 +469,192 @@ class _PublicPortfolioScreenState extends State<PublicPortfolioScreen> {
   Widget _buildFooter() {
     return Column(
       children: [
-        const Text('Made with SkillAura ✨', style: TextStyle(color: AppColors.textHint, fontSize: 14, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 8),
+        Text(
+          'Made with SkillAura ✨',
+          style: TextStyle(
+              color: AppColors.textHint,
+              fontSize: 13,
+              fontWeight: FontWeight.w500),
+        ),
+        const SizedBox(height: 6),
         TextButton(
-          onPressed: () => launchUrl(Uri.parse('https://skillaura.com')),
-          child: const Text('Create your own portfolio', style: TextStyle(color: AppColors.primary)),
-        )
+          onPressed: () => launchUrl(Uri.parse('https://skillaura.app')),
+          child: const Text('Create your own portfolio →',
+              style: TextStyle(color: AppColors.primary, fontSize: 13)),
+        ),
       ],
+    );
+  }
+}
+
+// ── Share Link Card ─────────────────────────────────────────────────────────────
+class _ShareLinkCard extends StatelessWidget {
+  final String link;
+  final VoidCallback onCopy;
+  const _ShareLinkCard({required this.link, required this.onCopy});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppColors.primary.withValues(alpha: 0.15),
+            const Color(0xFFFF6584).withValues(alpha: 0.1),
+          ],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.link_rounded, color: AppColors.primary, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Your Portfolio Link',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  link,
+                  style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 11),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: onCopy,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              decoration: BoxDecoration(
+                gradient: AppColors.primaryGradient,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.copy_rounded, color: Colors.white, size: 14),
+                  SizedBox(width: 4),
+                  Text('Copy', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Section Card ────────────────────────────────────────────────────────────────
+class _SectionCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final Widget child;
+  final Widget? trailing;
+  const _SectionCard({
+    required this.icon,
+    required this.title,
+    required this.child,
+    this.trailing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.2),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, color: AppColors.primary, size: 18),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                title,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700),
+              ),
+              if (trailing != null) ...[
+                const Spacer(),
+                trailing!,
+              ],
+            ],
+          ),
+          const SizedBox(height: 14),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+// ── Skill Chip ──────────────────────────────────────────────────────────────────
+class _SkillChip extends StatelessWidget {
+  final String label;
+  const _SkillChip({required this.label});
+
+  // Assign distinct colors by cycling through a palette
+  Color _color() {
+    const colors = [
+      Color(0xFF6C63FF), Color(0xFFFF6584), Color(0xFF43E97B),
+      Color(0xFF4FACFE), Color(0xFFFFBB00), Color(0xFFFF4757),
+    ];
+    return colors[label.length % colors.length];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = _color();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(
+        color: c.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: c.withValues(alpha: 0.35)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+            color: c,
+            fontSize: 12,
+            fontWeight: FontWeight.w600),
+      ),
     );
   }
 }

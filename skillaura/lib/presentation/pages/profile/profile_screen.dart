@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
@@ -1725,54 +1726,105 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildGeneratePortfolioButton() {
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final portfolioLink = 'http://localhost:8000/portfolio/$uid';
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      child: GestureDetector(
-        onTap: () {
-          final uid = FirebaseAuth.instance.currentUser?.uid;
-          if (uid != null) {
-            context.go('/portfolio/$uid');
-          }
-        },
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF6C63FF), Color(0xFFFF6584)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFFFF6584).withValues(alpha: 0.3),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.public, color: Colors.white, size: 22),
-              SizedBox(width: 8),
-              Text(
-                'View Public Portfolio',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.5,
+      child: Column(
+        children: [
+          // View Portfolio button
+          GestureDetector(
+            onTap: () {
+              if (uid.isNotEmpty) context.go('/portfolio/$uid');
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 15),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF6C63FF), Color(0xFFFF6584)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFFF6584).withValues(alpha: 0.3),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
-            ],
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.public, color: Colors.white, size: 20),
+                  SizedBox(width: 8),
+                  Text(
+                    'View Public Portfolio',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-        ),
+          const SizedBox(height: 10),
+          // Copy shareable link
+          GestureDetector(
+            onTap: () {
+              Clipboard.setData(ClipboardData(text: portfolioLink));
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Row(children: [
+                    Icon(Icons.link_rounded, color: Colors.white, size: 16),
+                    SizedBox(width: 8),
+                    Text('Portfolio link copied!', style: TextStyle(color: Colors.white)),
+                  ]),
+                  backgroundColor: const Color(0xFF6C63FF),
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF6C63FF).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF6C63FF).withValues(alpha: 0.4)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.link_rounded, color: Color(0xFF6C63FF), size: 18),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      portfolioLink,
+                      style: const TextStyle(color: Color(0xFF6C63FF), fontSize: 12),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Icon(Icons.copy_rounded, color: Color(0xFF6C63FF), size: 16),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
+
 }
+
 
 // ─── Skill Level Bar ────────────────────────────────────────────────────────
 

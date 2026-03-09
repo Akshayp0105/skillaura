@@ -8,8 +8,6 @@ import '../../../domain/entities/chat_message.dart';
 import '../../../services/user_service.dart';
 import 'package:uuid/uuid.dart';
 import 'package:file_picker/file_picker.dart';
-import 'dart:typed_data';
-import 'package:uuid/uuid.dart';
 
 const String _kBackendUrl = 'http://localhost:8000';
 
@@ -320,40 +318,88 @@ class _ImproveResumeChatScreenState extends State<ImproveResumeChatScreen> {
     }
   }
 
-  Future<void> _pickFile() async {
+  Future<void> _pickAndAnalyzeFile() async {
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['pdf', 'doc', 'docx', 'txt'],
+        allowedExtensions: ['pdf', 'doc', 'docx'],
         withData: true,
       );
 
-      if (result != null && result.files.isNotEmpty) {
-        final file = result.files.first;
-        final bytes = file.bytes;
-        if (bytes != null) {
-          // If it's a text file we can read it directly
-          if (file.extension == 'txt') {
-             String text = utf8.decode(bytes);
-             _controller.text = "Here is my resume content:\n\n$text";
-          } else {
-             // For PDF/DOCX, send to backend parser
-             _controller.text = "[Uploaded ${file.name}]";
-             // Optional: Extract text natively using pdf_text or just send base64 to backend
-             // I will send base64 encoded bytes in a hidden prompt
-             String base64File = base64Encode(bytes);
-             _history.add({
-               'role': 'user', 
-               'content': 'System: The user has uploaded a file named ${file.name}. Base64 Content: $base64File'
-             });
-             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Attached ${file.name}')));
-          }
+      if (result == null || result.files.isEmpty) return;
+
+      final file = result.files.first;
+      final bytes = file.bytes;
+      if (bytes == null) return;
+
+      // Show uploading indicator
+      setState(() {
+        _isTyping = true;
+        _messages.add(ChatMessage(
+          id: _uuid.v4(),
+          content: '📎 ${file.name}',
+          isUser: true,
+          timestamp: DateTime.now(),
+        ));
+      });
+      _scrollToBottom();
+
+      // Call backend to extract text + run ATS analysis
+      final base64Content = base64Encode(bytes);
+      final response = await http.post(
+        Uri.parse('$_kBackendUrl/analyze-resume-base64'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'content': base64Content, 'file_name': file.name}),
+      ).timeout(const Duration(seconds: 30));
+
+      setState(() => _isTyping = false);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final int atsScore = data['ats_score'] ?? 0;
+        final List skills = data['skills'] ?? [];
+        final List suggestions = data['suggestions'] ?? [];
+        final String skillText = skills.take(12).join(', ').isNotEmpty
+            ? skills.take(12).join(', ')
+            : 'None detected';
+        final String sugText = (suggestions as List).take(6)
+            .map((s) => '• $s').join('\n');
+
+        final String grade = atsScore >= 80 ? '🟢 Excellent' : atsScore >= 60 ? '🟡 Good' : '🔴 Needs Work';
+
+        final analysisReply =
+            '## 📊 Resume Analysis: ${file.name}\n\n'
+            '**ATS Score: $atsScore/100** — $grade\n\n'
+            '**Detected Skills (${skills.length}):**\n$skillText\n\n'
+            '### 🔧 Improvement Suggestions:\n$sugText\n\n'
+            '---\n*Type **build** to create an improved resume, or **menu** to return.*';
+
+        // Add to history so chatbot knows we analyzed a resume
+        _history.add({'role': 'user', 'content': '[User uploaded resume: ${file.name}]'});
+        _history.add({'role': 'assistant', 'content': analysisReply});
+
+        if (mounted) {
+          setState(() {
+            _messages.add(ChatMessage(
+              id: _uuid.v4(),
+              content: analysisReply,
+              isUser: false,
+              timestamp: DateTime.now(),
+            ));
+          });
+          _scrollToBottom();
         }
+      } else {
+        _showError('Could not analyze file. Try a text-based PDF or DOCX.');
       }
     } catch (e) {
-      _showError('Error picking file: $e');
+      if (mounted) {
+        setState(() => _isTyping = false);
+        _showError('Error reading file: ${e.toString().split(":").last.trim()}');
+      }
     }
   }
+
 
   Widget _buildInput() {
     return Container(
@@ -366,7 +412,8 @@ class _ImproveResumeChatScreenState extends State<ImproveResumeChatScreen> {
         children: [
           IconButton(
             icon: const Icon(Icons.attach_file, color: AppColors.textSecondary),
-            onPressed: _pickFile,
+            tooltip: 'Upload PDF/DOCX resume for analysis',
+            onPressed: _pickAndAnalyzeFile,
           ),
           Expanded(
             child: TextField(
