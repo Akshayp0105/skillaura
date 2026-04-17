@@ -1,150 +1,174 @@
-# skillaura
+# SkillAura  
+AI-Powered Career Guidance & Resume Intelligence Platform  
 
-AI-Powered Career Guidance & Resume Intelligence Platform
+SkillAura is an intelligent career guidance platform that helps students understand their skills, improve their resumes, and discover relevant internship and job opportunities using Artificial Intelligence and Natural Language Processing.
 
-SkillAura is an AI-driven career guidance platform designed for students and beginners who struggle to understand their skills, improve their resumes, and find relevant internships or job opportunities.
+---
 
-The platform uses Artificial Intelligence and Natural Language Processing (NLP) to analyze resumes, identify skills, evaluate career readiness, and recommend suitable opportunities.
+## Live Demo  
 
-Unlike traditional career platforms that rely on keyword-based matching, SkillAura performs semantic skill analysis and intelligent recommendations, helping students understand their strengths, weaknesses, and career direction.
+Frontend (Vercel): https://skillaura-h2l7.vercel.app  
+Backend (Render): https://skillaura.onrender.com  
 
-The system integrates resume analysis, skill discovery, internship recommendations, interview preparation, and progress tracking into a single unified platform.
+---
 
-# 🎯 Problem Statement
+## Overview  
 
-Many students face difficulties in early career planning because:
+SkillAura addresses a common problem faced by students and beginners — the lack of clarity in career direction and skill development.
 
-They do not clearly understand their skills and strengths
+Traditional platforms rely on keyword-based matching, which often results in inaccurate or irrelevant recommendations. SkillAura uses AI and NLP techniques to analyze resumes and user inputs in a more meaningful way, providing personalized and context-aware career guidance.
 
-Beginners often do not have a proper resume
+---
 
-Existing job platforms rely on keyword matching
+## Problem Statement  
 
-Students receive irrelevant internship recommendations
+Many students face challenges such as:
 
-Skill gaps are not clearly identified
+- Lack of clarity about their skills and strengths  
+- Poorly structured resumes  
+- Irrelevant internship or job recommendations  
+- Difficulty identifying skill gaps  
+- Scattered interview preparation resources  
 
-Interview preparation resources are scattered across platforms
+---
 
-SkillAura solves this by providing an AI-based unified career guidance system.
+## Solution  
 
-# 💡 Key Idea
+SkillAura provides a unified system that:
 
-SkillAura analyzes a student's resume, GitHub profile, or text input and automatically:
+- Extracts skills from resumes, GitHub profiles, or text input  
+- Evaluates resume quality and provides improvement suggestions  
+- Identifies missing skills required for specific roles  
+- Recommends relevant internships and job opportunities  
+- Supports interview preparation  
+- Tracks career progress over time  
 
-Extracts skills using AI & NLP
+---
 
-Evaluates resume quality
+## Core Features  
 
-Identifies missing skills
+### Skill Extraction  
+Uses NLP techniques to extract technical and soft skills from resumes and user inputs.
 
-Suggests relevant internships or jobs
+### Resume Evaluation  
+Analyzes structure, content, and relevance to generate a resume score and improvement suggestions.
 
-Provides interview preparation guidance
+### Internship and Job Recommendation  
+Matches user skills with industry requirements using semantic similarity.
 
-Tracks career readiness progress
+### Skill Gap Analysis  
+Identifies missing skills required for target roles and suggests areas for improvement.
 
-This helps students move from confusion → clarity → improvement → opportunities.
+### Interview Preparation  
+Provides structured guidance for technical and HR interviews.
 
-# ✨ Core Features
-1️⃣ AI Skill Extraction
-Automatically detects technical and soft skills from:
-Resume (PDF/Text)
-GitHub profiles
-User text input
-Uses NLP techniques to build a structured skill profile.
+### Progress Tracking  
+Tracks improvements in skills, resume quality, and career readiness.
 
-2️⃣ Resume Evaluation
-Analyzes resume quality based on:
-Content structure
-Skill representation
-Clarity and formatting
-Industry relevance
-Generates a resume score with improvement suggestions.
+---
 
-3️⃣ Internship & Job Recommendation
-Matches student skills with job requirements to recommend:
-Internships
-Entry-level roles
-Relevant companies
-Uses semantic similarity instead of keyword matching.
+## System Architecture  
 
+The platform follows a multi-layer architecture:
 
-4️⃣ Skill Gap Analysis
-Identifies missing skills required for a target role.
-Example:
-Current Skills: Python, HTML
-Target Role: Backend Developer
-Missing Skills:
-- FastAPI
-- SQL
-- Docker
-This helps students understand what to learn next.
+- Frontend: Flutter application  
+- Backend: FastAPI server  
+- AI Layer: NLP-based processing and analysis  
+- Database: Firebase Firestore  
 
-5️⃣ Interview Preparation
-Helps students prepare for:
-Technical interviews
-HR interviews
-Communication rounds
-Provides guidance and structured preparation resources.
+The system integrates modules such as skill analysis, resume evaluation, recommendation engine, and progress tracking. :contentReference[oaicite:0]{index=0}  
 
-6️⃣ Career Progress Tracking
-The platform continuously tracks:
-Resume improvements
-Skill development
-Career readiness score
-Recommendation updates
-This allows students to monitor their growth over time.
+---
 
-# 🛠 Tech Stack
-Frontend
-Flutter
-Dart
-JavaScript
+## Tech Stack  
 
-Backend
-Python
-FastAPI
-Database
-Firebase Firestore
-AI / NLP
-NLP libraries
-Resume parsing
-Semantic similarity models
+Frontend  
+- Flutter  
+- Dart  
+- JavaScript  
 
-Tools
-Git
-GitHub
-VS Code
+Backend  
+- Python  
+- FastAPI  
 
-⚙ Installation & Setup
-1️⃣ Clone Repository
+Database  
+- Firebase Firestore  
+
+AI / NLP  
+- Resume parsing  
+- Semantic similarity models  
+
+Tools  
+- Git  
+- GitHub  
+- VS Code  
+
+---
+
+## Deployment  
+
+Frontend  
+- Built using Flutter Web  
+- Deployed as a static site on Vercel  
+
+Backend  
+- FastAPI-based API service  
+- Deployed on Render  
+
+---
+
+## Installation and Setup  
+
+### Clone Repository  
+
+```bash
 git clone https://github.com/Akshayp0105/skillaura.git
 cd skillaura
+```
 
-2️⃣ Backend Setup
-
-Create virtual environment
+## Backend Setup
+```
 python -m venv .venv
-
-Activate
-Windows
 .venv\Scripts\activate
-
-Install dependencies
 pip install -r requirements.txt
-
-Run backend
 python main.py
+```
+## Frontend Setup
+```
+cd skillaura
+flutter run
+```
+## Build for Web (Deployment)
+```
+flutter build web
+```
+## Screenshots
+<img width="1919" height="885" alt="Screenshot 2026-04-17 130632" src="https://github.com/user-attachments/assets/efcacc8f-979e-4c9f-abd6-4e002e82f829" />
 
-3️⃣ Frontend Setup
+<img width="1893" height="813" alt="Screenshot 2026-04-17 130746" src="https://github.com/user-attachments/assets/962c7bc1-aae6-4ad5-8be2-39407b85a3ae" />
 
-Navigate to frontend folder
-cd frontend
+<img width="1919" height="890" alt="Screenshot 2026-04-17 130759" src="https://github.com/user-attachments/assets/9f1b6133-a49d-4000-9131-44f614dcb489" />
 
-Install dependencies
-npm install
+## Results
+-Accurate skill extraction using NLP
+-Effective resume scoring system
+-Relevant internship and job recommendations
+-Fast API response using FastAPI
+-User-friendly interface
+The system improves career readiness and helps students make informed decisions.
 
-Run project
-npm start
+## Future Enhancements
+-Advanced recommendation systems using deep learning
+-Gamification features (progress tracking, achievements)
+-Multi-language support
+-Real-time job market integration
+-Scalable analytics for career prediction
 
+## Author  
+
+Akshay P  
+
+Built and engineered the  SkillAura platform as an end-to-end solution, covering UI/UX design, backend development, and AI/NLP integration.
+
+## Conclusion
+SkillAura bridges the gap between student skills and industry expectations by providing intelligent, data-driven career guidance. It enables users to understand their abilities, improve continuously, and align with real-world opportunities.
