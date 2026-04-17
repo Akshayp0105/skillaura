@@ -1319,73 +1319,7 @@ def generate_suggestions(ats_result: Dict[str, Any], skills: List[str], missing_
 
     return suggestions[:10]
 
-# ── OpenAI Chat Proxy ──────────────────────────────────────────────────────────
-# Flutter Web cannot call api.openai.com directly (CORS). This endpoint acts
-# as a server-side proxy so the API key stays off the client too.
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-
-if not OPENAI_API_KEY:
-    raise ValueError("OPENAI_API_KEY not found. Please set it in .env file.")
-
-ENGLISH_COACH_SYSTEM_PROMPT = """
-You are an expert English language coach specialising in professional and academic communication.
-
-When the user sends any text:
-1. Check for grammar, spelling, punctuation and style errors.
-2. Provide a corrected version prefixed with "✅ Corrected:".
-3. Briefly explain each change in plain language (use bullet points).
-4. Give one actionable tip to help them improve further, prefixed with "💡 Tip:".
-5. End with an encouraging one-liner.
-
-If the text is already correct, say so warmly and still give a useful writing tip.
-Keep your tone friendly, concise and professional.
-"""
-
-class ChatRequest(BaseModel):
-    messages: List[dict]
-    model: Optional[str] = "gpt-4o"
-
-@app.post("/chat")
-async def chat_proxy(request: ChatRequest):
-    """Proxy endpoint for OpenAI Chat Completions — avoids CORS from Flutter Web."""
-    import httpx
-
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {OPENAI_API_KEY}",
-    }
-
-    payload = {
-        "model": request.model,
-        "messages": [
-            {"role": "system", "content": ENGLISH_COACH_SYSTEM_PROMPT},
-            *request.messages,
-        ],
-        "temperature": 0.5,
-        "max_tokens": 600,
-    }
-
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(
-                "https://api.openai.com/v1/chat/completions",
-                json=payload,
-                headers=headers,
-            )
-        if response.status_code == 200:
-            data = response.json()
-            reply = data["choices"][0]["message"]["content"].strip()
-            return {"reply": reply}
-        else:
-            error_detail = response.json().get("error", {}).get("message", f"OpenAI error {response.status_code}")
-            raise HTTPException(status_code=response.status_code, detail=error_detail)
-    except httpx.TimeoutException:
-        raise HTTPException(status_code=504, detail="Request to OpenAI timed out. Please try again.")
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Chat proxy error: {str(e)}")
-# ──────────────────────────────────────────────────────────────────────────────
+# ── English Practice Chat is handled by /chat endpoint using Gemini (see below) ──
 
 # ╔═════════════════════════════════════════════════════════════════════════════╗
 # ║          LIVE JOB SEARCH  ─  Adzuna API + SMTP Apply                      ║

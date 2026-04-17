@@ -6,6 +6,7 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../../../core/theme/app_theme.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class LiveInterviewScreen extends StatefulWidget {
   final String role;
@@ -43,10 +44,31 @@ class _LiveInterviewScreenState extends State<LiveInterviewScreen> {
 
   Future<void> _initialize() async {
     try {
+      // Prompt permissions explicitly first
+      await [Permission.camera, Permission.microphone].request();
+    } catch (e) {
+      debugPrint("Permission request error: $e");
+    }
+
+    try {
       // Initialize Camera
       final cameras = await availableCameras();
       if (cameras.isNotEmpty) {
-        _cameraController = CameraController(cameras.first, ResolutionPreset.medium);
+        // Find a front facing camera if possible, otherwise use the first one
+        CameraDescription? frontCamera;
+        for (var camera in cameras) {
+          if (camera.lensDirection == CameraLensDirection.front) {
+            frontCamera = camera;
+            break;
+          }
+        }
+        final selectedCamera = frontCamera ?? cameras.first;
+        
+        _cameraController = CameraController(
+          selectedCamera, 
+          ResolutionPreset.medium,
+          enableAudio: false, // Ensure audio is false so we don't conflict with SpeechToText
+        );
         await _cameraController!.initialize();
       } else {
         if (mounted) setState(() => _cameraError = true);
@@ -233,11 +255,13 @@ class _LiveInterviewScreenState extends State<LiveInterviewScreen> {
                     ),
                   )
                 else if (_cameraController != null && _cameraController!.value.isInitialized)
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
-                    child: AspectRatio(
-                      aspectRatio: _cameraController!.value.aspectRatio,
-                      child: CameraPreview(_cameraController!),
+                  Positioned.fill(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: AspectRatio(
+                        aspectRatio: _cameraController!.value.aspectRatio,
+                        child: CameraPreview(_cameraController!),
+                      ),
                     ),
                   )
                 else
