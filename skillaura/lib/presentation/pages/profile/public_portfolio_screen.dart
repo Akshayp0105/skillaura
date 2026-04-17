@@ -88,7 +88,7 @@ class _PublicPortfolioScreenState extends State<PublicPortfolioScreen>
     }
   }
 
-  String get _shareableLink => 'http://localhost:8000/portfolio/${widget.uid}';
+  String get _shareableLink => 'https://skillaura.vercel.app/portfolio/${widget.uid}';
   // For production: 'https://skillaura.app/portfolio/${widget.uid}'
 
   void _copyLink() {

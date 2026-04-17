@@ -9,7 +9,7 @@ import '../../../services/user_service.dart';
 import 'package:uuid/uuid.dart';
 import 'package:file_picker/file_picker.dart';
 
-const String _kBackendUrl = 'http://localhost:8000';
+const String _kBackendUrl = 'https://skillaura.onrender.com';
 
 class ImproveResumeChatScreen extends StatefulWidget {
   const ImproveResumeChatScreen({super.key});

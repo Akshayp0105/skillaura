@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
 
 class DailyTaskService {
-  static const String _base = 'http://localhost:8000';
+  static const String _base = 'https://skillaura.onrender.com';
   static final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   // ── Streak ──────────────────────────────────────────────────────────────────

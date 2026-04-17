@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import '../domain/entities/job.dart';
 
 class JobService {
-  static const String _baseUrl = 'http://localhost:8000';
+  static const String _baseUrl = 'https://skillaura.onrender.com';
 
   final http.Client _client = http.Client();
 

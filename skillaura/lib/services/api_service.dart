@@ -6,7 +6,7 @@ class ApiService {
   // Change this to your server's IP/URL when deploying
   // For local development, use your computer's local IP address
   static const String _baseUrl =
-      'http://localhost:8000'; // Windows desktop / iOS simulator
+      'https://skillaura.onrender.com'; // Production URL
   // static const String _baseUrl = 'http://10.0.2.2:8000'; // Android emulator localhost
   // static const String _baseUrl = 'http://YOUR_IP:8000'; // Physical device
 

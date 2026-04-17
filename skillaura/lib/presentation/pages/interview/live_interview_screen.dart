@@ -183,7 +183,7 @@ class _LiveInterviewScreenState extends State<LiveInterviewScreen> {
 
     try {
       final response = await http.post(
-        Uri.parse('http://localhost:8000/mock-interview'),
+        Uri.parse('https://skillaura.onrender.com/mock-interview'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'messages': _history,

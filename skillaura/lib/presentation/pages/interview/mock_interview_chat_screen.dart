@@ -9,7 +9,7 @@ import '../../../domain/entities/chat_message.dart';
 import '../../../services/user_service.dart';
 import 'package:uuid/uuid.dart';
 
-const String _kBackendUrl = 'http://localhost:8000';
+const String _kBackendUrl = 'https://skillaura.onrender.com';
 
 class MockInterviewChatScreen extends StatefulWidget {
   const MockInterviewChatScreen({super.key});

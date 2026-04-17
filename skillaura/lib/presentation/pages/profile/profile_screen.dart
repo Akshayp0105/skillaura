@@ -1727,7 +1727,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildGeneratePortfolioButton() {
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
-    final portfolioLink = 'http://localhost:8000/portfolio/$uid';
+    final portfolioLink = 'https://skillaura.vercel.app/portfolio/$uid';
 
     return Container(
       width: double.infinity,

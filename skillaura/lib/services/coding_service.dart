@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class CodingService {
-  static const String _base = 'http://localhost:8000';
+  static const String _base = 'https://skillaura.onrender.com';
   final _client = http.Client();
 
   Future<List<Map<String, dynamic>>> getCompanies({String search = ''}) async {

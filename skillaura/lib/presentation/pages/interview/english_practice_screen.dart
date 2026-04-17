@@ -7,7 +7,7 @@ import 'package:uuid/uuid.dart';
 
 // Backend proxy URL — Flutter Web cannot call OpenAI directly due to CORS.
 // All chat requests go through the Python backend at /chat.
-const String _kBackendUrl = 'http://localhost:8000';
+const String _kBackendUrl = 'https://skillaura.onrender.com';
 
 class EnglishPracticeScreen extends StatefulWidget {
   const EnglishPracticeScreen({super.key});
