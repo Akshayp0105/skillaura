@@ -5,5 +5,6 @@ __pycache__/
 .idea/
 .vscode/
 node_modules/
-build/
+# build/
+!skillaura/build/web/
 .dart_tool/
