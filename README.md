@@ -1,4 +1,4 @@
-## SkillAura  
+## SkillAura  : Learning For Future
 AI-Powered Career Guidance & Resume Intelligence Platform. 
 
 SkillAura is an intelligent career guidance platform that helps students understand their skills, improve their resumes, and discover relevant internship and job opportunities using Artificial Intelligence and Natural Language Processing.
