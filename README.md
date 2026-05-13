@@ -9,6 +9,7 @@ SkillAura is an intelligent career guidance platform that helps students underst
 ## Live Demo  
 
 Frontend (Vercel): https://skillaura-h2l7.vercel.app  
+
 Backend (Render): https://skillaura.onrender.com  
 
 ---
