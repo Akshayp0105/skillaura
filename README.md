@@ -1,4 +1,4 @@
-## SkillAura: Learning For Future
+# SkillAura: Learning For Future
 AI-Powered Career Guidance & Resume Intelligence Platform. 
 
 
